@@ -1,0 +1,20 @@
+# Data
+*.npy
+*.pkl
+*.zip
+
+# IDE
+.DS_Stroe
+._.DS_Store
+**/.DS_Store
+**/._.DS_Store
+.idea
+
+**/__pycache__/
+__pycache__
+
+**/__MACOSX
+/__MACOSX
+
+# Model
+*.bin
