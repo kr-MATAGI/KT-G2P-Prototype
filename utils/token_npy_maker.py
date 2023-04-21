@@ -12,7 +12,7 @@ from typing import Dict, List
 
 from kocharelectra_tokenization import KoCharElectraTokenizer
 from definition.data_def import KT_TTS
-
+from hangul_utils import split_syllables, join_jamos
 
 import platform
 if "Windows" == platform.system():
@@ -72,6 +72,7 @@ class KoCharNpyMaker:
                       raw_data_list: List[KT_TTS], g2p_data_list: List[KT_TTS],
                       out_vocab_path: str, max_seq_len: int=256):
         print(f"[KoCharNpyMaker][_tokenization] max_seq_len: {max_seq_len}")
+
         npy_dict = {
             "input_ids": [],
             "attention_mask": [],
@@ -137,42 +138,46 @@ class KoCharNpyMaker:
                 p_set = []
                 for p in m_res:
                     p_set.extend([pos_tag2ids[x] if x in pos_tag2ids.keys() else "O" for x in p[-1]])
-                if 5 > len(p_set):
-                    p_set += [pos_tag2ids["O"]] * (5-len(p_set))
+                if 5 > len(p_set): # 최대로 저장할 pos 개수 : 5
+                    p_set.extend([pos_tag2ids["O"]] * (5 - len(p_set)))
                 else:
                     p_set = p_set[:5]
                 pos_list.append(p_set)
 
-            if 70 > len(pos_list):
-                pos_list += [[0, 0, 0, 0, 0]] * (70 - len(pos_list))
+            if 70 > len(pos_list): # 최대 어절이 63~67
+                pos_list.extend([[0, 0, 0, 0, 0]] * (70 - len(pos_list)))
             else:
                 pos_list = pos_list[:70]
-            npy_dict["pos_ids"].append(pos_list)
 
             # For raw_data
             raw_tokens = tokenizer(raw_data.sent, padding="max_length", max_length=max_seq_len, return_tensors="np",
                                    truncation=True)
 
             # For g2p_data
-            b_use_data = True
-            if self.b_use_out_vocab:
-                g2p_tokens, b_use_data = self._tokenize_using_output_vocab(g2p_sent=g2p_data.sent,
-                                                                           tag2ids=out_token_dict, max_seq_len=max_seq_len)
-                if b_use_data:
-                    npy_dict["labels"].append(g2p_tokens)
-                else:
-                    except_output_pron_list.append((raw_data.id, raw_data.sent, g2p_data.sent))
-            else:
-                g2p_tokens = tokenizer(g2p_data.sent, padding="max_length", max_length=max_seq_len,
-                                       return_tensors="np", truncation=True)
-                npy_dict["labels"].append(g2p_tokens["input_ids"][0])
+            ''' 발음열 문장에서 '였' '것' 같은 오류의 종성을 'ㄷ'으로 처리 '''
+            for g_idx, g2p_item in enumerate(g2p_data.sent):
+                g2p_jaso = list(split_syllables(g2p_item))
+                if 3 == len(g2p_jaso) and ('ㅅ' == g2p_jaso[-1] or 'ㅆ' == g2p_jaso[-1]):
+                    g2p_jaso[-1] = 'ㄷ'
+                    g2p_data.sent = g2p_data.sent.replace(g2p_item, join_jamos("".join(g2p_jaso)))
 
-            if b_use_data:
-                npy_dict["input_ids"].append(raw_tokens["input_ids"][0])
-                npy_dict["attention_mask"].append(raw_tokens["attention_mask"][0])
-                npy_dict["token_type_ids"].append(raw_tokens["token_type_ids"][0])
-            else:
-                continue
+            g2p_tokens = tokenizer(g2p_data.sent, padding="max_length", max_length=max_seq_len,
+                                   return_tensors="np", truncation=True)
+
+            # Check size
+            assert max_seq_len == len(raw_tokens["input_ids"][0]), f"ERR - input_ids, {len(raw_tokens['input_ids'])}"
+            assert max_seq_len == len(raw_tokens["attention_mask"][0]), "ERR - attention_mask"
+            assert max_seq_len == len(raw_tokens["token_type_ids"][0]), "ERR - tokent_type_ids"
+            assert max_seq_len == len(g2p_tokens["input_ids"][0]), "ERR - g2p_tokens"
+            assert 70 == len(pos_list), "ERR - pos_ids"
+
+            # Insert npy_dict
+            npy_dict["input_ids"].append(raw_tokens["input_ids"][0])
+            npy_dict["attention_mask"].append(raw_tokens["attention_mask"][0])
+            npy_dict["token_type_ids"].append(raw_tokens["token_type_ids"][0])
+            npy_dict["labels"].append(g2p_tokens["input_ids"][0])
+            npy_dict["pos_ids"].append(pos_list)
+
 
         # (음절) 발음열 사전을 사용할 경우 예외에 대한 출력
         print("[KoCharNpyMaker][make_kt_tts_npy] (음절) 발음열 사전 사용시 오류가 발생한 문장")
@@ -287,15 +292,15 @@ class KoCharNpyMaker:
         curr_char_cnt = 0
         for ej_idx, eojeol in enumerate(mecab_res):
             if char_cnt_list[len_idx] == curr_char_cnt:
-                # total_eojeol_morp.append([" ", ["O"]])
                 total_eojeol_morp.append(copy.deepcopy(eojeol_set))
                 eojeol_set = []
                 len_idx += 1
                 curr_char_cnt = 0
             if use_check[ej_idx]:
                 continue
-            eojeol_set.append([eojeol[0], eojeol[1].split("+")])
-            curr_char_cnt += len(eojeol[0])
+
+            eojeol_set.append((eojeol[0], eojeol[1].split("+")))
+            curr_char_cnt += len(eojeol[0].strip()) # 에듀' '  <- Mecab 결과에 공백이 따라오는 경우 있음
             use_check[ej_idx] = True
         if 0 < len(eojeol_set):
             total_eojeol_morp.append(copy.deepcopy(eojeol_set))
