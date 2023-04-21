@@ -13,7 +13,14 @@ from transformers import ElectraModel, ElectraPreTrainedModel
 #==============================================================
 class ElectraStdPronRules(ElectraPreTrainedModel):
 #==============================================================
-    def __init__(self, config, tokenizer, out_ids2tag, out_tag2ids, jaso_pair_dict):
+    def __init__(
+        self,
+        config,
+        tokenizer,
+        out_ids2tag,
+        out_tag2ids,
+        jaso_pair_dict,
+    ):
         super(ElectraStdPronRules, self).__init__(config)
 
         # init
@@ -48,11 +55,18 @@ class ElectraStdPronRules(ElectraPreTrainedModel):
                                         device=config.device)
         self.fc_layer = nn.Linear(config.hidden_size, config.out_vocab_size)
 
-
         # Initialize weights and apply final processing
         self.post_init()
 
-    def forward(self, input_ids, attention_mask=None, token_type_ids=None, labels=None, mode: str="train"):
+    def forward(
+        self,
+        input_ids,
+        attention_mask=None,
+        token_type_ids=None,
+        labels=None,
+        pos_ids=None,
+        mode: str="train",
+    ):
         '''
             mode
                 1) train

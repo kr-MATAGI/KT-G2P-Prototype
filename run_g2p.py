@@ -2,6 +2,7 @@ import os
 import json
 import re
 import glob
+import copy
 
 import torch
 import torch.nn as nn
@@ -16,18 +17,21 @@ from attrdict import AttrDict
 from typing import Dict, List
 from tqdm import tqdm
 import evaluate as hug_eval
-import pandas as pd
 
 from run_utils import (
     load_npy_file, G2P_Dataset,
     init_logger, make_inputs_from_batch
 )
 
+### OurSam Dict
+from definition.data_def import OurSamDebug
+
 ### GLOBAL
 logger = init_logger()
 
 #========================================
-def evaluate(args, model, tokenizer, eval_dataset, mode, output_vocab: Dict[str, int], global_step: str):
+def evaluate(args, model, tokenizer, eval_dataset, mode,
+             output_vocab: Dict[str, int], our_sam_dict: Dict[str, str], global_steps: int):
 #========================================
     # init
     eval_sampler = SequentialSampler(eval_dataset)
@@ -56,6 +60,9 @@ def evaluate(args, model, tokenizer, eval_dataset, mode, output_vocab: Dict[str,
     pred_list = []
     ans_list = []
 
+    ''' 우리말 샘 문자열-발음열 처리 위해서 '''
+    pos_list = []
+
     criterion = nn.CrossEntropyLoss()
     eval_pbar = tqdm(eval_dataloader)
     eval_start_time = time.time()
@@ -75,33 +82,67 @@ def evaluate(args, model, tokenizer, eval_dataset, mode, output_vocab: Dict[str,
             pred_list.append(torch.argmax(logits, dim=-1).detach().cpu())
             ans_list.append(inputs["labels"].detach().cpu())
 
+            pos_list.append(inputs["pos_ids"].detach().cpu())
+
         nb_eval_steps += 1
         eval_pbar.set_description("Eval Loss - %.04f" % (eval_loss / nb_eval_steps))
     # end loop
     eval_end_time = time.time()
 
-    for (input_item, pred_item, ans_item) in zip(inputs_list, pred_list, ans_list):
-        for p_idx, (input_i, pred, lab) in enumerate(zip(input_item, pred_item, ans_item)):
-            ref_str = "".join([output_ids2tok[x] for x in lab.tolist()])
-            # ref_str = tokenizer.decode(lab.tolist())
-            ref_str = ref_str.replace("[CLS]", "").replace("[SEP]", "").replace("[PAD]", "").strip()
+    ''' 우리말샘 말뭉치-발음열 변경 Debug '''
+    change_count = 0
+    our_sam_debug_list: List[OurSamDebug] = []
+    for (input_item, pred_item, ans_item, pos_item) in zip(inputs_list, pred_list, ans_list, pos_list):
+        for p_idx, (input_i, pred, lab, pos) in enumerate(zip(input_item, pred_item, ans_item, pos_item[1:-1])):
+            input_sent = tokenizer.decode(input_i)
+            input_sent = input_sent.replace("[CLS]", "").replace("[SEP]", "").replace("[PAD]", "").strip()
 
-            candi_str = "".join([output_ids2tok[x] for x in pred.tolist()])
+            pred_sent = "".join([output_ids2tok[x] for x in pred.tolist()])
             # candi_str = tokenizer.decode(pred.tolist())
-            candi_str = candi_str.replace("[CLS]", "").replace("[SEP]", "").replace("[PAD]", "").strip()
+            pred_sent = pred_sent.replace("[CLS]", "").replace("[SEP]", "").replace("[PAD]", "").strip()
 
-            raw_sent = tokenizer.decode(input_i)
-            raw_sent = raw_sent.replace("[CLS]", "").replace("[SEP]", "").replace("[PAD]", "").strip()
-            print(f"{p_idx}:\nraw: \n{raw_sent}\ncandi: \n{candi_str}\nref: \n{ref_str}")
+            ans_sent = "".join([output_ids2tok[x] for x in lab.tolist()])
+            # ref_str = tokenizer.decode(lab.tolist())
+            ans_sent = ans_sent.replace("[CLS]", "").replace("[SEP]", "").replace("[PAD]", "").strip()
 
-            references.append(ref_str)
-            candidates.append(candi_str)
-            if ref_str == candi_str:
+            ''' 우리말 샘 문자열-발음열 대치 '''
+            ''' debug '''
+            our_sam_debug = OurSamDebug(
+                input_sent=input_sent, pred_sent=pred_sent, ans_sent=ans_sent
+            )
+
+            cp_pred_sent = copy.deepcopy(pred_sent.split(" "))
+            split_ans_sent = ans_sent.split(" ")
+            for rs_idx, raw_sp_item in enumerate(input_sent.split(" ")):
+                include_flag = True
+                for tag in pos[rs_idx]:
+                    if tag.item() not in [1, 2]: # 1: NNP, 2: NNG
+                        include_flag = False
+                        break
+                if include_flag and raw_sp_item in our_sam_dict.keys(): ''' 여기 안들어감 ㅋㅋㅋㅋ..... '''
+
+                    our_sam_debug.input_word.append(raw_sp_item)
+                    our_sam_debug.pred_word.append(cp_pred_sent[rs_idx])
+                    our_sam_debug.our_sam_word.append(our_sam_dict[raw_sp_item])
+                    our_sam_debug.ans_word.append(split_ans_sent[rs_idx])
+
+                    change_count += 1
+                    cp_pred_sent[rs_idx] = our_sam_dict[raw_sp_item]
+            # pred_sent = " ".join(cp_pred_sent).strip()
+            our_sam_debug.conv_sent = pred_sent
+            if 0 < len(our_sam_debug.input_word):
+                our_sam_debug_list.append(our_sam_debug)
+
+            print(f"{p_idx}:\nraw: \n{input_sent}\ncandi: \n{pred_sent}\nref: \n{ans_sent}")
+
+            references.append(ans_sent)
+            candidates.append(pred_sent)
+            if ans_sent == pred_sent:
                 total_correct += 1
             else:
-                wrong_case["input_sent"].append(raw_sent)
-                wrong_case["candi_sent"].append(candi_str)
-                wrong_case["ref_sent"].append(ref_str)
+                wrong_case["input_sent"].append(input_sent)
+                wrong_case["candi_sent"].append(pred_sent)
+                wrong_case["ref_sent"].append(ans_sent)
 
     wer_score = hug_eval.load("wer").compute(predictions=candidates, references=references)
     per_score = hug_eval.load("cer").compute(predictions=candidates, references=references)
@@ -110,11 +151,29 @@ def evaluate(args, model, tokenizer, eval_dataset, mode, output_vocab: Dict[str,
     print(f"[run_g2p][evaluate] s_acc: {total_correct/len(eval_dataset) * 100}, size: {total_correct}, "
           f"total.size: {len(eval_dataset)}")
     print(f"[run_g2p][evaluate] Elapsed time: {eval_end_time - eval_start_time} seconds")
+    print(f"[run_g2p][evaluate] our_sam change count: {change_count}")
 
     eval_pbar.close()
 
+    ''' 우리말 샘 변경 사항 파일로 저장'''
+    with open("./debug/our_sam_debug.txt", mode="w", encoding="utf-8") as w_f:
+        for d_idx, debug_item in enumerate(our_sam_debug_list):
+            w_f.write(f"{str(d_idx)}\n\n")
+            w_f.write(f"입력 문장:\n{debug_item.input_sent}\n\n")
+            w_f.write(f"예측 문장:\n{debug_item.pred_sent}\n\n")
+            w_f.write(f"정답 문장:\n{debug_item.ans_sent}\n\n")
+            w_f.write(f"변경된 문장:\n{debug_item.conv_sent}\n\n")
+
+            w_f.write("=========================\n")
+            w_f.write(f"입력  예측  변경  정답\n")
+            for inp, pred, conv, ans in zip(debug_item.input_word, debug_item.pred_word,
+                                            debug_item.our_sam_word, debug_item.ans_word):
+                w_f.write(f"{inp}\t{pred}\t{conv}\t{ans}\n")
+            w_f.write("=========================\n\n")
+
 #========================================
-def train(args, model, tokenizer, train_dataset, dev_dataset, output_vocab: Dict[str, int]):
+def train(args, model, tokenizer, train_dataset, dev_dataset,
+          output_vocab: Dict[str, int], our_sam_dict: Dict[str, str]):
 #========================================
     # init
     train_data_len = len(train_dataset)
@@ -206,7 +265,8 @@ def train(args, model, tokenizer, train_dataset, dev_dataset, output_vocab: Dict
 
                 if (args.logging_steps > 0 and global_step % args.logging_steps == 0) and \
                         args.evaluate_test_during_training:
-                    evaluate(args, model, tokenizer, dev_dataset, "dev", output_vocab, global_step)
+                    evaluate(args, model, tokenizer, dev_dataset, "dev",
+                             output_vocab, our_sam_dict, global_steps=global_step)
 
         logger.info("  Epoch Done= %d", epoch + 1)
         pbar.close()
@@ -214,11 +274,15 @@ def train(args, model, tokenizer, train_dataset, dev_dataset, output_vocab: Dict
     return global_step, tr_loss / global_step
 
 #========================================
-def main(config_path: str, decoder_vocab_path: str, jaso_post_proc_path: str):
+def main(config_path: str,
+         decoder_vocab_path: str,
+         jaso_post_proc_path: str,
+         our_sam_path: str
+ ):
 #========================================
     # Check path
     print(f"[run_g2p][main] config_path: {config_path}\nout_vocab_path: {decoder_vocab_path}, "
-          f"jaso_post_proc_path: {jaso_post_proc_path}")
+          f"jaso_post_proc_path: {jaso_post_proc_path}\nour_sam_path: {our_sam_path}")
 
     if not os.path.exists(config_path):
         raise Exception("ERR - Check config_path")
@@ -226,6 +290,8 @@ def main(config_path: str, decoder_vocab_path: str, jaso_post_proc_path: str):
         raise Exception("ERR - Check decoder_vocab_path")
     if not os.path.exists(jaso_post_proc_path):
         raise Exception("ERR - Check jaso_pos_proc_path")
+    if not os.path.exists(our_sam_path):
+        raise Exception("ERR - Check our_sam_path")
 
     # Read config file
     with open(config_path) as f:
@@ -246,6 +312,12 @@ def main(config_path: str, decoder_vocab_path: str, jaso_post_proc_path: str):
     post_proc_dict: Dict[str, Dict[str, List[str]]] = {}
     with open(jaso_post_proc_path, mode="r", encoding="utf-8") as f:
         post_proc_dict = json.load(f)
+
+    ''' 우리말 샘 문자열-발음열 사전 '''
+    our_sam_dict: Dict[str, str] = {}
+    with open(our_sam_path, mode="rb") as f:
+        our_sam_dict = json.load(f)
+    print(f"[run_g2p][main] our_sam_dict.size: {len(our_sam_dict)}")
 
     # Load model
     tokenizer = KoCharElectraTokenizer.from_pretrained(args.model_name_or_path)
@@ -282,7 +354,8 @@ def main(config_path: str, decoder_vocab_path: str, jaso_post_proc_path: str):
         train_datasets = G2P_Dataset(item_dict=train_inputs, labels=train_labels)
         dev_datasets = G2P_Dataset(item_dict=dev_inputs, labels=dev_labels)
 
-        global_step, tr_loss = train(args, model, tokenizer, train_datasets, dev_datasets, output_vocab=decoder_vocab)
+        global_step, tr_loss = train(args, model, tokenizer, train_datasets, dev_datasets,
+                                     output_vocab=decoder_vocab, our_sam_dict=our_sam_dict)
         logger.info(f'global_step = {global_step}, average loss = {tr_loss}')
 
     # Do Eval !
@@ -310,7 +383,7 @@ def main(config_path: str, decoder_vocab_path: str, jaso_post_proc_path: str):
                                                         out_ids2tag=decoder_ids2tag, jaso_pair_dict=post_proc_dict)
             model.to(args.device)
             evaluate(args, model, tokenizer, test_datasets, mode="test",
-                     output_vocab=decoder_vocab, global_step=global_step)
+                     output_vocab=decoder_vocab, our_sam_dict=our_sam_dict, global_steps=global_step)
 
 ### MAIN ###
 if "__main__" == __name__:
@@ -318,4 +391,5 @@ if "__main__" == __name__:
 
     main(config_path="./config/kocharelectra_config.json",
          decoder_vocab_path="./data/vocab/decoder_vocab/pron_eumjeol_vocab.json",
-         jaso_post_proc_path="./data/vocab/post_process/jaso_filter.json")
+         jaso_post_proc_path="./data/vocab/post_process/jaso_filter.json",
+         our_sam_path="./data/our_sam_filter_dict.json")

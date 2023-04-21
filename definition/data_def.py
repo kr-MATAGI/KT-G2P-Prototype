@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import List
 
 @dataclass
 class KT_TTS:
@@ -82,6 +83,21 @@ MECAB_POS_TAG = {
     39: "SC", 40: "SY",  # 구분자, (붙임표, 기타 기호)
     41: "SL", 42: "SH", 43: "SN",  # 외국어, 한자, 숫자
 }
+
+
+#==================================================
+@dataclass
+class OurSamDebug:
+#==================================================
+    input_sent: str = ""
+    pred_sent: str = ""
+    ans_sent: str = ""
+    conv_sent: str = ""
+
+    input_word: List[str] = field(default_factory=list)
+    pred_word: List[str] = field(default_factory=list)
+    our_sam_word: List[str] = field(default_factory=list)
+    ans_word: List[str] = field(default_factory=list)
 
 ### main ###
 if "__main__" == __name__:

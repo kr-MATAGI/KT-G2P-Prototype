@@ -87,7 +87,8 @@ def make_inputs_from_batch(batch: torch.Tensor, device: str):
         "input_ids": batch["input_ids"].to(device),
         "attention_mask": batch["attention_mask"].to(device),
         "token_type_ids": batch["token_type_ids"].to(device),
-        "labels": batch["labels"].to(device)
+        "labels": batch["labels"].to(device),
+        "pos_ids": batch["pos_ids"].to(device)
     }
 
     return inputs

@@ -137,7 +137,7 @@ class KoCharNpyMaker:
             for m_res in mecab_res:
                 p_set = []
                 for p in m_res:
-                    p_set.extend([pos_tag2ids[x] if x in pos_tag2ids.keys() else "O" for x in p[-1]])
+                    p_set.extend([pos_tag2ids[x] if x in pos_tag2ids.keys() else pos_tag2ids["O"] for x in p[-1]])
                 if 5 > len(p_set): # 최대로 저장할 pos 개수 : 5
                     p_set.extend([pos_tag2ids["O"]] * (5 - len(p_set)))
                 else:
@@ -161,8 +161,22 @@ class KoCharNpyMaker:
                     g2p_jaso[-1] = 'ㄷ'
                     g2p_data.sent = g2p_data.sent.replace(g2p_item, join_jamos("".join(g2p_jaso)))
 
-            g2p_tokens = tokenizer(g2p_data.sent, padding="max_length", max_length=max_seq_len,
-                                   return_tensors="np", truncation=True)
+            if self.b_use_out_vocab:
+                g2p_tokens = {"input_ids": []}
+
+                split_g2p = list(g2p_data.sent)
+                split_g2p.insert(0, "[CLS]")
+
+                if max_seq_len <= len(split_g2p):
+                    split_g2p = split_g2p[:max_seq_len-1]
+                    split_g2p.append("[SEP]")
+                else:
+                    split_g2p.append("[SEP]")
+                    split_g2p += ["[PAD]"] * (max_seq_len - len(split_g2p))
+                g2p_tokens["input_ids"].append([out_token_dict[x] for x in split_g2p])
+            else:
+                g2p_tokens = tokenizer(g2p_data.sent, padding="max_length", max_length=max_seq_len,
+                                       return_tensors="np", truncation=True)
 
             # Check size
             assert max_seq_len == len(raw_tokens["input_ids"][0]), f"ERR - input_ids, {len(raw_tokens['input_ids'])}"
