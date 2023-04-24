@@ -84,6 +84,29 @@ MECAB_POS_TAG = {
     41: "SL", 42: "SH", 43: "SN",  # 외국어, 한자, 숫자
 }
 
+@dataclass
+class KrStdDict:
+    id: int
+    word: str
+    lexi_super: str
+    origin: str
+    pronun: str
+
+@dataclass
+class ConjuInfo:
+    word: str = ""
+    pronun: List[str] = field(default_factory=list)
+
+@dataclass
+class OurSamDict:
+    target_code: str = ""
+    word: str = ""
+    sense_id: str = ""
+    pronun: List[str] = field(default_factory=list)
+    pos: str = ""
+    cat: str = ""
+    conjugation: List[ConjuInfo] = field(default_factory=list)
+    abbreviation: List[ConjuInfo] = field(default_factory=list)
 
 #==================================================
 @dataclass

@@ -133,7 +133,7 @@ class KoCharNpyMaker:
             mecab_res = mecab.pos(raw_data.sent)
             mecab_res = self._make_eojeol_mecab_res(raw_data.sent, mecab_res)
 
-            pos_list = []
+            pos_list = [[0, 0, 0, 0, 0]]
             for m_res in mecab_res:
                 p_set = []
                 for p in m_res:

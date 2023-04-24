@@ -20,10 +20,16 @@ import evaluate as hug_eval
 
 from run_utils import (
     load_npy_file, G2P_Dataset,
-    init_logger, make_inputs_from_batch
+    init_logger, make_inputs_from_batch,
+    make_eojeol_mecab_res
 )
 
 ### OurSam Dict
+import platform
+if "Windows" == platform.system():
+    from eunjeon import Mecab # Windows
+else:
+    from konlpy.tag import Mecab # Linux
 from definition.data_def import OurSamDebug
 
 ### GLOBAL
@@ -90,10 +96,11 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
     eval_end_time = time.time()
 
     ''' 우리말샘 말뭉치-발음열 변경 Debug '''
+    mecab = Mecab()
     change_count = 0
     our_sam_debug_list: List[OurSamDebug] = []
-    for (input_item, pred_item, ans_item, pos_item) in zip(inputs_list, pred_list, ans_list, pos_list):
-        for p_idx, (input_i, pred, lab, pos) in enumerate(zip(input_item, pred_item, ans_item, pos_item[1:-1])):
+    for (input_item, pred_item, ans_item) in zip(inputs_list, pred_list, ans_list):
+        for p_idx, (input_i, pred, lab) in enumerate(zip(input_item, pred_item, ans_item)):
             input_sent = tokenizer.decode(input_i)
             input_sent = input_sent.replace("[CLS]", "").replace("[SEP]", "").replace("[PAD]", "").strip()
 
@@ -111,16 +118,22 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
                 input_sent=input_sent, pred_sent=pred_sent, ans_sent=ans_sent
             )
 
+            mecab_res = mecab.pos(input_sent)
+            mecab_res = make_eojeol_mecab_res(input_sent, mecab_res)
+            mecab_res = [y[-1] for x in mecab_res for y in x]
+            # [['MAG'], ['MAG'], ['VV'], ['EP'], ['EF']]
+
             cp_pred_sent = copy.deepcopy(pred_sent.split(" "))
             split_ans_sent = ans_sent.split(" ")
             for rs_idx, raw_sp_item in enumerate(input_sent.split(" ")):
                 include_flag = True
-                for tag in pos[rs_idx]:
-                    if tag.item() not in [1, 2]: # 1: NNP, 2: NNG
+                for tag in mecab_res[rs_idx]:
+                    if tag not in ["NNG", "NNP"]: # 1: NNP, 2: NNG
                         include_flag = False
                         break
-                if include_flag and raw_sp_item in our_sam_dict.keys(): ''' 여기 안들어감 ㅋㅋㅋㅋ..... '''
-
+                if not include_flag:
+                    continue
+                if raw_sp_item in our_sam_dict.keys():
                     our_sam_debug.input_word.append(raw_sp_item)
                     our_sam_debug.pred_word.append(cp_pred_sent[rs_idx])
                     our_sam_debug.our_sam_word.append(our_sam_dict[raw_sp_item])
@@ -128,12 +141,12 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
 
                     change_count += 1
                     cp_pred_sent[rs_idx] = our_sam_dict[raw_sp_item]
-            # pred_sent = " ".join(cp_pred_sent).strip()
+            pred_sent = " ".join(cp_pred_sent).strip()
             our_sam_debug.conv_sent = pred_sent
             if 0 < len(our_sam_debug.input_word):
                 our_sam_debug_list.append(our_sam_debug)
 
-            print(f"{p_idx}:\nraw: \n{input_sent}\ncandi: \n{pred_sent}\nref: \n{ans_sent}")
+            # print(f"{p_idx}:\nraw: \n{input_sent}\ncandi: \n{pred_sent}\nref: \n{ans_sent}")
 
             references.append(ans_sent)
             candidates.append(pred_sent)

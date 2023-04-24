@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import Dataset
 
 import logging
-
+import copy
 import random
 import numpy as np
 
@@ -92,3 +92,31 @@ def make_inputs_from_batch(batch: torch.Tensor, device: str):
     }
 
     return inputs
+
+
+def make_eojeol_mecab_res(input_sent: str, mecab_res: List):
+    # 어절별 글자 수 체크해서 띄워쓰기 적기
+    split_text = input_sent.split(" ")
+    char_cnt_list = [len(st) for st in split_text]
+
+    total_eojeol_morp = []
+    eojeol_set = []
+    use_check = [False for _ in range(len(mecab_res))]
+    len_idx = 0
+    curr_char_cnt = 0
+    for ej_idx, eojeol in enumerate(mecab_res):
+        if char_cnt_list[len_idx] == curr_char_cnt:
+            total_eojeol_morp.append(copy.deepcopy(eojeol_set))
+            eojeol_set = []
+            len_idx += 1
+            curr_char_cnt = 0
+        if use_check[ej_idx]:
+            continue
+
+        eojeol_set.append((eojeol[0], eojeol[1].split("+")))
+        curr_char_cnt += len(eojeol[0].strip())  # 에듀' '  <- Mecab 결과에 공백이 따라오는 경우 있음
+        use_check[ej_idx] = True
+    if 0 < len(eojeol_set):
+        total_eojeol_morp.append(copy.deepcopy(eojeol_set))
+
+    return total_eojeol_morp
