@@ -139,7 +139,7 @@ class OurSamMaker:
                 continue
 
             ''' 3. 품사 필터링 '''
-            if filter_data.pos not in ['명사', '대명사', '동사', '형용사']:
+            if filter_data.pos not in ['명사', '대명사']:
                 continue
 
             ''' 4. word가 없는 것 제외 '''
