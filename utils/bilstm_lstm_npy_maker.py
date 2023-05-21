@@ -22,25 +22,25 @@ else:
 from definition.data_def import MECAB_POS_TAG
 
 #========================================================
-class KoCharNpyMaker:
+class LstmEncDecNpyMaker:
 #========================================================
     def __init__(self,
                  b_debug_mode: bool=False,
                  b_convert_pronounce: bool=False):
-        print("[KoCharNpyMaker] __init__ !")
+        print("[LstmEncDecNpyMaker] __init__ !")
 
         self.b_use_out_vocab = False
 
         self.b_convert_pronounce = b_convert_pronounce
         self.b_debug_mode = b_debug_mode
-        print(f"[KoCharNpyMaker][__init__] b_convert_pronounce: {self.b_convert_pronounce}, "
+        print(f"[LstmEncDecNpyMaker][__init__] b_convert_pronounce: {self.b_convert_pronounce}, "
               f"b_debug_mod: {self.b_debug_mode}")
 
-    def make_kt_tts_npy(self, raw_path: str, g2p_path: str,
-                        save_path: str, out_vocab_path: str,
-                        max_seq_len: int=256):
-        print(f"[KoCharNpyMaker][make_kt_tts_npy] raw_data: {raw_path},\ng2p_path: {g2p_path}")
-        print(f"[KoCharNpyMaker][make_kt_ttes_npy] out_vocab_path:{out_vocab_path}")
+    def make_bilstm_lstm_npy(self, raw_path: str, g2p_path: str,
+                             save_path: str, out_vocab_path: str,
+                             max_seq_len: int=256):
+        print(f"[LstmEncDecNpyMaker][make_bilstm_lstm_npy] raw_data: {raw_path},\ng2p_path: {g2p_path}")
+        print(f"[LstmEncDecNpyMaker][make_bilstm_lstm_npy] out_vocab_path:{out_vocab_path}")
 
         if not os.path.exists(raw_path):
             raise Exception("Not Existed -", raw_path)
@@ -56,7 +56,7 @@ class KoCharNpyMaker:
             all_raw_data = pickle.load(f)
         with open(g2p_path, mode="rb") as f:
             all_g2p_data = pickle.load(f)
-        print(f"[KoCharNpyMaker][make_kt_tts_npy] all_raw_data.size:: {len(all_raw_data)}, "
+        print(f"[LstmEncDecNpyMaker][make_bilstm_lstm_npy] all_raw_data.size:: {len(all_raw_data)}, "
               f"all_g2p_data.size: {len(all_g2p_data)}")
         assert len(all_raw_data) == len(all_g2p_data), "ERR - diff size"
 
@@ -71,7 +71,7 @@ class KoCharNpyMaker:
     def _tokenization(self, tokenizer_name: str,
                       raw_data_list: List[KT_TTS], g2p_data_list: List[KT_TTS],
                       out_vocab_path: str, max_seq_len: int=256):
-        print(f"[KoCharNpyMaker][_tokenization] max_seq_len: {max_seq_len}")
+        print(f"[LstmEncDecNpyMaker][_tokenization] max_seq_len: {max_seq_len}")
 
         npy_dict = {
             "input_ids": [],
@@ -94,7 +94,7 @@ class KoCharNpyMaker:
             out_token_dict: Dict[str, int] = {}
             with open(out_vocab_path, mode="r", encoding="utf-8") as f:
                 out_token_dict = json.load(f)
-            print(f"[KoCharNpyMaker][_tokenization] out_token_dict.size: {len(out_token_dict.keys())}")
+            print(f"[LstmEncDecNpyMaker][_tokenization] out_token_dict.size: {len(out_token_dict.keys())}")
             print(list(out_token_dict.items())[:10])
 
             out_token_ids2tag = {v: k for k, v in out_token_dict.items()}
@@ -113,7 +113,7 @@ class KoCharNpyMaker:
                 continue
 
             if 0 == (root_idx % 1000):
-                print(f"[KoCharNpyMaker][make_kt_tts_npy] {root_idx} is processing... {raw_data.sent}")
+                print(f"[LstmEncDecNpyMaker][make_kt_tts_npy] {root_idx} is processing... {raw_data.sent}")
 
             if raw_data.id != g2p_data.id:
                 raise Exception(f"ERR - ID diff, raw_data: {raw_data.id}, g2p_data: {g2p_data.id}")
@@ -194,25 +194,25 @@ class KoCharNpyMaker:
 
 
         # (음절) 발음열 사전을 사용할 경우 예외에 대한 출력
-        print("[KoCharNpyMaker][make_kt_tts_npy] (음절) 발음열 사전 사용시 오류가 발생한 문장")
+        print("[LstmEncDecNpyMaker][make_kt_tts_npy] (음절) 발음열 사전 사용시 오류가 발생한 문장")
         for e_idx, except_item in enumerate(except_output_pron_list):
             print(e_idx, except_item)
 
-        print(f"[KoCharNpyMaker][make_kt_tts_npy] sent_max_len: {sent_max_len}, "
+        print(f"[LstmEncDecNpyMaker][make_kt_tts_npy] sent_max_len: {sent_max_len}, "
               f"mean_sent_len: {total_sent_len/len(raw_data_list)}")
 
-        print(f"[KoCharNpyMaker][make_kt_tts_npy] max_eojeol_size: {max_eojeol_size}")
+        print(f"[LstmEncDecNpyMaker][make_kt_tts_npy] max_eojeol_size: {max_eojeol_size}")
 
         return npy_dict
 
     def _save_npy(self, npy_dict: Dict[str, List], save_path: str):
         total_size = len(npy_dict["input_ids"])
-        print(f"[KoCharNpyMaker][_save_npy] save_path: {save_path}, total_size: {total_size}")
+        print(f"[LstmEncDecNpyMaker][_save_npy] save_path: {save_path}, total_size: {total_size}")
 
         split_ratio = 0.1
         dev_s_idx = int(total_size * (split_ratio * 8))
         dev_e_idx = int(dev_s_idx + (total_size * split_ratio))
-        print(f"[KoCharNpyMaker][_save_npy] split_ratio: {split_ratio}, dev_s_idx: {dev_s_idx}, dev_e_idx: {dev_e_idx}")
+        print(f"[LstmEncDecNpyMaker][_save_npy] split_ratio: {split_ratio}, dev_s_idx: {dev_s_idx}, dev_e_idx: {dev_e_idx}")
 
         npy_dict["input_ids"] = np.array(npy_dict["input_ids"])
         npy_dict["attention_mask"] = np.array(npy_dict["attention_mask"])
@@ -227,7 +227,7 @@ class KoCharNpyMaker:
         train_labels = npy_dict["labels"][:dev_s_idx]
         train_pos_ids = npy_dict["pos_ids"][:dev_s_idx]
 
-        print(f"[KoCharNpyMaker][_save_npy] Train.shape\ninput_ids: {train_input_ids.shape},"
+        print(f"[LstmEncDecNpyMaker][_save_npy] Train.shape\ninput_ids: {train_input_ids.shape},"
               f"attention_mask: {train_attention_mask.shape}, token_type_ids: {train_token_type_ids.shape},"
               f"labels.shape: {train_labels.shape}, pos_ids.shape: {train_pos_ids.shape}")
 
@@ -238,7 +238,7 @@ class KoCharNpyMaker:
         dev_labels = npy_dict["labels"][dev_s_idx:dev_e_idx]
         dev_pos_ids = npy_dict["pos_ids"][dev_s_idx:dev_e_idx]
 
-        print(f"[KoCharNpyMaker][_save_npy] Dev.shape\ninput_ids: {dev_input_ids.shape},"
+        print(f"[LstmEncDecNpyMaker][_save_npy] Dev.shape\ninput_ids: {dev_input_ids.shape},"
               f"attention_mask: {dev_attention_mask.shape}, token_type_ids: {dev_token_type_ids.shape},"
               f"labels.shape: {dev_labels.shape}, pos_ids.shape: {dev_pos_ids.shape}")
 
@@ -249,7 +249,7 @@ class KoCharNpyMaker:
         test_labels = npy_dict["labels"][dev_e_idx:]
         test_pos_ids = npy_dict["pos_ids"][dev_e_idx:]
 
-        print(f"[KoCharNpyMaker][_save_npy] Test.shape\ninput_ids: {test_input_ids.shape},"
+        print(f"[LstmEncDecNpyMaker][_save_npy] Test.shape\ninput_ids: {test_input_ids.shape},"
               f"attention_mask: {test_attention_mask.shape}, token_type_ids: {test_token_type_ids.shape},"
               f"labels.shape: {test_labels.shape}, pos_ids.shape: {test_pos_ids.shape}")
 
@@ -323,9 +323,9 @@ class KoCharNpyMaker:
 
 ### MAIN ###
 if "__main__" == __name__:
-    kt_tts_maker = KoCharNpyMaker(b_convert_pronounce=False, b_debug_mode=False)
+    lstm_npy_maker = LstmEncDecNpyMaker(b_convert_pronounce=False, b_debug_mode=False)
 
-    kt_tts_maker.make_kt_tts_npy(raw_path="../data/kor/pkl/kor_source_filter.pkl",
-                                 g2p_path="../data/kor/pkl/kor_target.pkl",
-                                 save_path="../data/kor/npy/lstm",
-                                 out_vocab_path="../data/vocab/pron_eumjeol_vocab.json")
+    lstm_npy_maker.make_bilstm_lstm_npy(raw_path="../data/kor/pkl/kor_source_filter.pkl",
+                                        g2p_path="../data/kor/pkl/kor_target.pkl",
+                                        save_path="../data/kor/npy/lstm",
+                                        out_vocab_path="../data/vocab/pron_eumjeol_vocab.json")
