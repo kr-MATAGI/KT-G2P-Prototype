@@ -325,7 +325,7 @@ class KoCharNpyMaker:
 if "__main__" == __name__:
     kt_tts_maker = KoCharNpyMaker(b_convert_pronounce=False, b_debug_mode=False)
 
-    kt_tts_maker.make_kt_tts_npy(raw_path="../data/data_busan/kor/pkl/kor_source_filter.pkl",
-                                 g2p_path="../data/data_busan/kor/pkl/kor_target.pkl",
-                                 save_path="../data/data_busan/kor/npy",
-                                 out_vocab_path="../data/vocab/decoder_vocab/pron_eumjeol_vocab.json")
+    kt_tts_maker.make_kt_tts_npy(raw_path="../data/kor/pkl/kor_source_filter.pkl",
+                                 g2p_path="../data/kor/pkl/kor_target.pkl",
+                                 save_path="../data/kor/npy/lstm",
+                                 out_vocab_path="../data/vocab/pron_eumjeol_vocab.json")
