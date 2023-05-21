@@ -4,7 +4,7 @@
   "dev_npy": "./data/data_busan/kor/npy/dev.npy",
   "test_npy": "./data/data_busan/kor/npy/test.npy",
   "evaluate_test_during_training": true,
-  "eval_all_checkpoints": true,
+  "eval_all_checkpoints": false,
   "save_optimizer": false,
   "do_train": false,
   "do_eval": true,
@@ -24,5 +24,6 @@
   "logging_steps": 858,
   "save_steps": 858,
   "learning_rate": 5e-5,
-  "device": "cuda"
+  "device": "cuda",
+  "use_custom_vocab": false
 }

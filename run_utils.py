@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import Dataset
 
+import json
 import logging
 import copy
 import random
@@ -28,6 +29,12 @@ def set_seed(seed):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
+
+#===============================================================
+def print_args(args, logger):
+#===============================================================
+    for key, val in args.items():
+        logger.info(f"[print_args] {key}: {val}")
 
 #===============================================================
 def load_npy_file(src_path: str, mode: str):
@@ -93,8 +100,9 @@ def make_inputs_from_batch(batch: torch.Tensor, device: str):
 
     return inputs
 
-
+#===============================================================
 def make_eojeol_mecab_res(input_sent: str, mecab_res: List):
+#===============================================================
     # 어절별 글자 수 체크해서 띄워쓰기 적기
     split_text = input_sent.split(" ")
     char_cnt_list = [len(st) for st in split_text]
@@ -120,3 +128,4 @@ def make_eojeol_mecab_res(input_sent: str, mecab_res: List):
         total_eojeol_morp.append(copy.deepcopy(eojeol_set))
 
     return total_eojeol_morp
+
