@@ -15,7 +15,7 @@ from attrdict import AttrDict
 
 from tqdm import tqdm
 from transformers import get_linear_schedule_with_warmup
-from model.electra_only_nart_dec_model import ElectraOnlyDecModel
+from model.electra_only_art_dec_model import ElectraOnlyDecModel
 
 from utils.kocharelectra_tokenization import KoCharElectraTokenizer
 from run_utils import (
@@ -35,6 +35,7 @@ else:
 ### GLOBAL
 logger = init_logger()
 tokenizer = KoCharElectraTokenizer.from_pretrained('monologg/kocharelectra-base-discriminator')
+
 
 
 #========================================================================
@@ -100,7 +101,7 @@ def train(args, model, train_datasets, dev_datasets, src_vocab, dec_vocab, our_s
             inputs["mode"] = "train"
 
             output = model(**inputs)
-            word_ins = output['word_ins']['out']
+            word_ins = output['word_ins']['out'][0]
 
             word_ins = F.log_softmax(word_ins, -1)
             loss = criterion(word_ins.view(-1, len(dec_vocab)), batch["tgt_tokens"].view(-1).to(args.device))
@@ -145,6 +146,7 @@ def train(args, model, train_datasets, dev_datasets, src_vocab, dec_vocab, our_s
 
     return global_step, tr_loss / global_step
 
+
 #========================================================================
 def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step, our_sam_vocab):
 #========================================================================
@@ -188,7 +190,6 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
     time_per_iteration = []
     model.eval()
     for batch in eval_pbar:
-        torch.cuda.synchronize()
         with torch.no_grad():
             inputs = make_electra_only_dec_inputs(batch)
             inputs["mode"] = "eval"
@@ -198,20 +199,19 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
             ender.record()
 
             # Wait for gpu sync
-            torch.cuda.synchronize()
             curr_time = starter.elapsed_time(ender)
             time_per_iteration.append(curr_time)
 
-            word_ins = output['word_ins']['out']
-            word_ins = F.log_softmax(word_ins, -1)
-            loss = criterion(word_ins.view(-1, len(dec_vocab)), batch["tgt_tokens"].view(-1).to(args.device))
+            word_ins = output['word_ins']['out'][0]
+            # word_ins = F.log_softmax(word_ins, -1)
+            word_ins = torch.argmax(word_ins, -1)
 
+            loss = criterion(word_ins.view(-1, len(dec_vocab)), batch["tgt_tokens"].view(-1).to(args.device))
             eval_loss += loss.mean().item()
 
             batch_src_tok_list.append(inputs["src_tokens"].detach().cpu())
             pred_tok_list.append(torch.argmax(word_ins, -1).detach().cpu())
             ans_tok_list.append(batch["tgt_tokens"].detach().cpu())
-
         eval_steps += 1
         eval_pbar.set_description("Eval Loss - %.04f" % (eval_loss / eval_steps))
     # end loop
@@ -284,7 +284,7 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
     print(f"[run_electra_non_dec][evaluate] per_score: {per_score * 100}, size: {len(candidates)}")
     print(f"[run_electra_non_dec][evaluate] s_acc: {total_correct / len(eval_datasets) * 100}, size: {total_correct}, "
           f"total.size: {len(eval_datasets)}")
-    print(f"[run_electra_non_dec][evaluate] Elapsed time: {sum(time_per_iteration) / len(eval_datasets) * 1000} seconds")
+    # print(f"[run_electra_non_dec][evaluate] Elapsed time: {eval_end_time - eval_start_time} seconds")
 
     logger.info("---Eval End !")
     eval_pbar.close()
@@ -307,7 +307,7 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
 
     # wrong case
     wrong_df = pd.DataFrame(wrong_case)
-    wrong_df.to_csv(f"./results/electra_nart_dec/{mode}_wrong_case.csv", index=False, header=True)
+    wrong_df.to_csv(f"./results/electra_art_dec/{mode}_wrong_case.csv", index=False, header=True)
 
 #========================================================================
 def main(config_path: str, custom_vocab_path: str, our_sam_path: str):
@@ -334,7 +334,6 @@ def main(config_path: str, custom_vocab_path: str, our_sam_path: str):
         [SEP] : 3
         [MASK] : 4
     '''
-
     src_vocab = get_vocab_type_dictionary(tokenizer=tokenizer, is_kochar_electra=True)
     if config.use_custom_vocab:
         dec_vocab = get_vocab_type_dictionary(custom_vocab_path, is_kochar_electra=False)
@@ -395,9 +394,9 @@ def main(config_path: str, custom_vocab_path: str, our_sam_path: str):
 
 ### MAIN ###
 if '__main__' == __name__:
-    logger.info(f'[run_electra_nart_dec][__main__]---------START electra_nart_dec')
+    logger.info(f'[run_electra_art_dec][__main__]---------START electra_art_dec')
 
-    config_path = './config/electra_nart_dec_config.json'
+    config_path = './config/electra_art_dec_config.json'
     custom_vocab_path = './data/vocab/pron_eumjeol_vocab.json'
     our_sam_path = './data/dictionary/our_sam_std_dict.pkl'
 

@@ -3,6 +3,7 @@ import json
 import re
 import glob
 import copy
+import pickle
 
 import torch
 import torch.nn as nn
@@ -115,51 +116,52 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
 
             ''' 우리말 샘 문자열-발음열 대치 '''
             ''' debug '''
-            our_sam_debug = OurSamDebug(
-                input_sent=input_sent, pred_sent=pred_sent, ans_sent=ans_sent
-            )
+            if args.use_our_sam:
+                our_sam_debug = OurSamDebug(
+                    input_sent=input_sent, pred_sent=pred_sent, ans_sent=ans_sent
+                )
 
-            mecab_res = mecab.pos(input_sent)
-            mecab_res = make_eojeol_mecab_res(input_sent, mecab_res)
-            pos_list = []
-            for res_item in mecab_res:
-                eojeol_pos = []
-                for morp_item in res_item:
-                    eojeol_pos.extend(morp_item[-1])
-                pos_list.append(eojeol_pos)
-            mecab_res = pos_list
-            # [[('저', ['NP']), ('를', ['JKO'])], [('부르', ['VV']), ('셨', ['EP', 'EP']), ('나요', ['EC'])]]
-            # [['NP', 'JKO'], ['VV', 'EP', 'EP', 'EC']]
+                mecab_res = mecab.pos(input_sent)
+                mecab_res = make_eojeol_mecab_res(input_sent, mecab_res)
+                pos_list = []
+                for res_item in mecab_res:
+                    eojeol_pos = []
+                    for morp_item in res_item:
+                        eojeol_pos.extend(morp_item[-1])
+                    pos_list.append(eojeol_pos)
+                mecab_res = pos_list
+                # [[('저', ['NP']), ('를', ['JKO'])], [('부르', ['VV']), ('셨', ['EP', 'EP']), ('나요', ['EC'])]]
+                # [['NP', 'JKO'], ['VV', 'EP', 'EP', 'EC']]
 
-            cp_pred_sent = copy.deepcopy(pred_sent.split(" "))
-            split_ans_sent = ans_sent.split(" ")
-            for rs_idx, raw_sp_item in enumerate(input_sent.split(" ")):
-                include_flag = True
-                for tag in mecab_res[rs_idx]:
-                    if tag not in ["NNG", "NNP"]: # 1: NNP, 2: NNG
-                        include_flag = False
-                        break
-                if not include_flag:
-                    continue
-                if raw_sp_item in our_sam_dict.keys():
-                    our_sam_debug.input_word.append(raw_sp_item)
-                    our_sam_debug.pred_word.append(cp_pred_sent[rs_idx])
-                    our_sam_debug.our_sam_word.append(our_sam_dict[raw_sp_item])
-                    our_sam_debug.ans_word.append(split_ans_sent[rs_idx])
+                cp_pred_sent = copy.deepcopy(pred_sent.split(" "))
+                split_ans_sent = ans_sent.split(" ")
+                for rs_idx, raw_sp_item in enumerate(input_sent.split(" ")):
+                    include_flag = True
+                    for tag in mecab_res[rs_idx]:
+                        if tag not in ["NNG", "NNP"]: # 1: NNP, 2: NNG
+                            include_flag = False
+                            break
+                    if not include_flag:
+                        continue
+                    if raw_sp_item in our_sam_dict.keys():
+                        our_sam_debug.input_word.append(raw_sp_item)
+                        our_sam_debug.pred_word.append(cp_pred_sent[rs_idx])
+                        our_sam_debug.our_sam_word.append(our_sam_dict[raw_sp_item])
+                        our_sam_debug.ans_word.append(split_ans_sent[rs_idx])
 
-                    change_count += 1
-                    cp_pred_sent[rs_idx] = our_sam_dict[raw_sp_item]
+                        change_count += 1
+                        cp_pred_sent[rs_idx] = our_sam_dict[raw_sp_item]
 
-            origin_pred_sent = copy.deepcopy(pred_sent)
-            pred_sent = " ".join(cp_pred_sent).strip()
-            our_sam_debug.conv_sent = pred_sent
-            if 0 < len(our_sam_debug.input_word):
-                our_sam_debug_list.append(our_sam_debug)
+                origin_pred_sent = copy.deepcopy(pred_sent)
+                pred_sent = " ".join(cp_pred_sent).strip()
+                our_sam_debug.conv_sent = pred_sent
+                if 0 < len(our_sam_debug.input_word):
+                    our_sam_debug_list.append(our_sam_debug)
 
-                if origin_pred_sent != pred_sent and pred_sent == ans_sent:
-                    fixed_our_sam_list.append(our_sam_debug)
-                elif origin_pred_sent != pred_sent and pred_sent != ans_sent:
-                    wrong_our_sam_list.append(our_sam_debug)
+                    if origin_pred_sent != pred_sent and pred_sent == ans_sent:
+                        fixed_our_sam_list.append(our_sam_debug)
+                    elif origin_pred_sent != pred_sent and pred_sent != ans_sent:
+                        wrong_our_sam_list.append(our_sam_debug)
 
             # print(f"{p_idx}:\nraw: \n{input_sent}\ncandi: \n{pred_sent}\nref: \n{ans_sent}")
 
@@ -184,9 +186,9 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
     eval_pbar.close()
 
     ''' 우리말 샘 변경 사항 파일로 저장'''
-    save_debug_txt("./debug/our_sam_debug.txt", our_sam_debug_list)
-    save_debug_txt("./debug/fixed_our_sam_debug.txt", fixed_our_sam_list)
-    save_debug_txt("./debug/wrong_our_sam_debug.txt", wrong_our_sam_list)
+    save_debug_txt("./results/bilstm_lstm/our_sam_debug.txt", our_sam_debug_list)
+    save_debug_txt("./results/bilstm_lstm/fixed_our_sam_debug.txt", fixed_our_sam_list)
+    save_debug_txt("./results/bilstm_lstm/wrong_our_sam_debug.txt", wrong_our_sam_list)
 
 #============================================================
 def save_debug_txt(save_path: str, our_sam_debug_list: List[OurSamDebug]):
@@ -318,7 +320,7 @@ def main(config_path: str,
  ):
 #========================================
     # Check path
-    print(f"[run_g2p][main] config_path: {config_path}\nout_vocab_path: {decoder_vocab_path}, "
+    print(f"[run_g2p][main] config_path: {config_path}\nout_vocab_path: {decoder_vocab_path}\n"
           f"jaso_post_proc_path: {jaso_post_proc_path}\nour_sam_path: {our_sam_path}")
 
     if not os.path.exists(config_path):
@@ -333,6 +335,7 @@ def main(config_path: str,
     # Read config file
     with open(config_path) as f:
         args = AttrDict(json.load(f))
+    args.output_dir = os.path.join(args.ckpt_dir, args.output_dir)
 
     if 0 < len(args.device) and ("cuda" == args.device or "cpu" == args.device):
         print(f"---- Config.Device: {args.device}")
@@ -351,9 +354,9 @@ def main(config_path: str,
         post_proc_dict = json.load(f)
 
     ''' 우리말 샘 문자열-발음열 사전 '''
-    our_sam_dict: Dict[str, str] = {}
+    our_sam_dict: None
     with open(our_sam_path, mode="rb") as f:
-        our_sam_dict = json.load(f)
+        our_sam_dict = pickle.load(f)
     print(f"[run_g2p][main] our_sam_dict.size: {len(our_sam_dict)}")
 
     # Load model
@@ -375,6 +378,7 @@ def main(config_path: str,
     args.out_vocab_size = len(decoder_vocab.keys())
     config.vocab_size = args.vocab_size
     config.out_vocab_size = args.out_vocab_size
+    config.do_post_method = args.do_post_method
 
     model = ElectraStdPronRules.from_pretrained(args.model_name_or_path,
                                                 config=config, tokenizer=tokenizer, out_tag2ids=decoder_vocab,
@@ -426,7 +430,7 @@ def main(config_path: str,
 if "__main__" == __name__:
     print("[run_g2p][__main__] MAIN !")
 
-    main(config_path="./config/kocharelectra_config.json",
-         decoder_vocab_path="./data/vocab/decoder_vocab/pron_eumjeol_vocab.json",
-         jaso_post_proc_path="./data/vocab/post_process/jaso_filter.json",
-         our_sam_path="./data/our_sam_filter_dict.json")
+    main(config_path="config/electra_bilstm_lstm.json",
+         decoder_vocab_path="./data/vocab/pron_eumjeol_vocab.json",
+         jaso_post_proc_path="./data/post_method/jaso_filter.json",
+         our_sam_path="./data/dictionary/our_sam_std_dict.pkl")

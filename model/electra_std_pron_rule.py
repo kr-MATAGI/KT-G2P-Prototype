@@ -101,7 +101,7 @@ class ElectraStdPronRules(ElectraPreTrainedModel):
         '''
             decoded_batch_sent.size: [batch_size, seq_len]
         '''
-        if "eval" == mode:
+        if "eval" == mode and self.config.do_post_method:
             decoded_batch_eumjeol_sent = self._decode_batch_sentences(input_ids)
 
         output = []
@@ -109,7 +109,7 @@ class ElectraStdPronRules(ElectraPreTrainedModel):
             h_t, c_t = self.decoder_cell(enc_out[:, t], (h_t, c_t))
             out_t = self.fc_layer(h_t) # [batch, out_vocab_size]
 
-            if "eval" == mode:
+            if "eval" == mode and self.config.do_post_method:
                 '''
                     현재 시점에서 적용할 수 있는 발음열(음절)을 가져온다
                     mutable_pron_list : [batch, mutable_list_ids_size]

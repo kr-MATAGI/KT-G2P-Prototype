@@ -120,18 +120,10 @@ class ElectraOnlyDecModel(nn.Module):
         bert_encoder = ElectraModel.from_pretrained(args.model_name_or_path, output_hidden_states=True)
         args.bert_out_dim = bert_encoder.config.hidden_size
 
-        decoder = cls.build_nat_decoder(args, tgt_dict, decoder_embed_tokens)
-        # decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
+        decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
 
         args.mask_cls_sep = False
         return ElectraOnlyDecModel(decoder, bert_encoder, src_berttokenizer, args.mask_cls_sep, args)
-
-    @classmethod
-    def build_nat_decoder(cls, args, tgt_dict, embed_tokens):
-        decoder = ElectraFusedNATDecoder(args, tgt_dict, embed_tokens)
-        if getattr(args, "apply_bert_init", False):
-            decoder.apply(init_bert_params)
-        return decoder
 
     @classmethod
     def build_decoder(cls, args, tgt_dict, embed_tokens):
@@ -172,36 +164,24 @@ class ElectraOnlyDecModel(nn.Module):
         bert_encoder_out = bert_encoder_out.permute(1, 0, 2).contiguous()
 
         ''' 이쪽 부분에서 Key가 원래 코드랑 다름 '''
-        encoder_out = {
-            'encoder_out': bert_encoder_out,
-            'encoder_padding_mask': bert_encoder_padding_mask,
-        }
-
-        # encoder_out = EncoderOut(
-        #     encoder_out=bert_encoder_out,
-        #     encoder_padding_mask=bert_encoder_padding_mask,
-        #     encoder_embedding=None,
-        #     encoder_states=None,
-        #     src_tokens=src_tokens,
-        #     src_lengths=src_lengths
-        # )
-
-        length_out = self.decoder.forward_length(
-            normalize=False, encoder_out=encoder_out
-        )
-        length_tgt = self.decoder.forward_length_prediction(
-            length_out, encoder_out, kwargs["tgt_tokens"]
+        encoder_out = EncoderOut(
+            encoder_out=bert_encoder_out,
+            encoder_padding_mask=bert_encoder_padding_mask,
+            encoder_embedding=None,
+            encoder_states=None,
+            src_tokens=src_tokens,
+            src_lengths=src_lengths
         )
 
         # decoding
         word_ins_out = self.decoder(
-            normalize=False,
+            # normalize=False,
             prev_output_tokens=prev_output_tokens,
             encoder_out=encoder_out
         )
 
         # 자소제한 후처리
-        if self.args.do_post_method and "eval" == mode:
+        if self.args.do_post_method and "eval" == kwargs['mode']:
             decoded_batch_eumjeol_sent = self._decode_batch_sentences(src_tokens)
             for t in range(self.args.max_seq_len):
                 mutable_pron_list = self._get_mutable_pron_list(time_step=t, batch_size=1,
@@ -220,9 +200,9 @@ class ElectraOnlyDecModel(nn.Module):
                 "nll_loss": True,
             },
             "length": {
-                "out": length_out,
-                "tgt": length_tgt,
-                "factor": self.decoder.length_loss_factor,
+                "out": None,
+                "tgt": None,
+                "factor": None # self.decoder.length_loss_factor,
             },
         }
 

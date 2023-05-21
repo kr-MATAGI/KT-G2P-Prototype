@@ -1,8 +1,8 @@
 {
-  "ckpt_dir": "ko-char-electra-encoder-decoder",
-  "train_npy": "./data/data_busan/kor/npy/train.npy",
-  "dev_npy": "./data/data_busan/kor/npy/dev.npy",
-  "test_npy": "./data/data_busan/kor/npy/test.npy",
+  "ckpt_dir": "ckpt-electra-bilstm-lstm",
+  "train_npy": "./data/kor/npy/lstm/train.npy",
+  "dev_npy": "./data/kor/npy/lstm/dev.npy",
+  "test_npy": "./data/kor/npy/lstm/test.npy",
   "evaluate_test_during_training": true,
   "eval_all_checkpoints": false,
   "save_optimizer": false,
@@ -17,7 +17,7 @@
   "max_grad_norm": 1.0,
   "model_type": "electra-base",
   "model_name_or_path": "monologg/kocharelectra-base-discriminator",
-  "output_dir": "./test_model/ckpt-ar-end2end",
+  "output_dir": "electra-bilstm-lstm",
   "seed": 42,
   "train_batch_size": 64,
   "eval_batch_size": 1,
@@ -25,5 +25,7 @@
   "save_steps": 858,
   "learning_rate": 5e-5,
   "device": "cuda",
-  "use_custom_vocab": false
+  "use_custom_vocab": true,
+  "do_post_method": false,
+  "use_our_sam": false
 }
