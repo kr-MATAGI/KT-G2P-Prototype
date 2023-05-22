@@ -23,7 +23,7 @@
   "model_name_or_path": "monologg/kocharelectra-base-discriminator",
   "output_dir": "electra-non-pos-decoder-6-layer",
   "seed": 42,
-  "train_batch_size": 32,
+  "train_batch_size": 64,
   "eval_batch_size": 128,
   "logging_steps": 858,
   "save_steps": 858,
