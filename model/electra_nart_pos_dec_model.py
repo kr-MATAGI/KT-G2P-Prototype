@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from model.nonauto_nmt.pos_nart_decoder import Decoder, softmax
+from model.nonauto_nmt.pos_nart_decoder import Decoder
 from transformers import ElectraModel
 
 #========================================================
@@ -50,6 +50,8 @@ class ElectraNartPosDecModel(nn.Module):
         src_masks = self.prepare_masks(src_tokens)
         electra_out = self.electra(input_ids=src_tokens, attention_mask=src_masks)
         electra_out = electra_out.hidden_states
+        if 1 == self.args.dec_layers:
+            electra_out = [electra_out[-1]]
 
         '''
             x = decoder_inputs,
@@ -60,12 +62,11 @@ class ElectraNartPosDecModel(nn.Module):
 
         return decoder_out
 
-
 def base_decoder_architecture(args):
     # maybe decoder
     args.d_model = 768
     args.d_hidden = 768
-    args.n_layers = 6
+    args.n_layers = args.dec_layers
     args.n_heads = 8
     args.drop_ratio = 0.1
     args.warmp = 16000
@@ -81,4 +82,3 @@ def base_decoder_architecture(args):
 
     # need to know
     args.use_wo = True
-
