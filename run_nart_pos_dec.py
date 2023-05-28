@@ -103,8 +103,8 @@ def train(args, model, train_datasets, dev_datasets, src_vocab, dec_vocab, our_s
 
             output = model(**inputs)
             output = F.log_softmax(output, -1)
-            loss = criterion(output.reshape(-1, len(dec_vocab)), batch["tgt_tokens"].view(-1).to(args.device))
 
+            loss = criterion(output.reshape(-1, len(dec_vocab)), batch["tgt_tokens"].view(-1).to(args.device))
             loss.backward()
             optimizer.step()
 

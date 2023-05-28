@@ -225,26 +225,26 @@ class NartNpyMaker:
               f"labels.shape: {test_labels.shape}")
 
         # Save
-        np.save(save_path + "/train_input_ids", train_input_ids)
+        np.save(save_path + "/train_src_tokens", train_input_ids)
         np.save(save_path + "/train_attention_mask", train_attention_mask)
         np.save(save_path + "/train_token_type_ids", train_token_type_ids)
-        np.save(save_path + "/train_labels", train_labels)
+        np.save(save_path + "/train_target", train_labels)
 
-        np.save(save_path + "/dev_input_ids", dev_input_ids)
+        np.save(save_path + "/dev_src_tokens", dev_input_ids)
         np.save(save_path + "/dev_attention_mask", dev_attention_mask)
         np.save(save_path + "/dev_token_type_ids", dev_token_type_ids)
-        np.save(save_path + "/dev_labels", dev_labels)
+        np.save(save_path + "/dev_target", dev_labels)
 
-        np.save(save_path + "/test_input_ids", test_input_ids)
+        np.save(save_path + "/test_src_tokens", test_input_ids)
         np.save(save_path + "/test_attention_mask", test_attention_mask)
         np.save(save_path + "/test_token_type_ids", test_token_type_ids)
-        np.save(save_path + "/test_labels", test_labels)
+        np.save(save_path + "/test_target", test_labels)
 
 ### MAIN ###
 if '__main__' == __name__:
     print(f'[nart_npy_maker][__main__] MAIN !')
 
-    nart_npy_maker = NartNpyMaker(b_debug_mode=False, b_use_custom_vocab=True)
+    nart_npy_maker = NartNpyMaker(b_debug_mode=False, b_use_custom_vocab=False)
     nart_npy_maker.make_nart_npy(
         src_path='../data/kor/pkl/kor_source_filter.pkl',
         tgt_path='../data/kor/pkl/kor_target.pkl',

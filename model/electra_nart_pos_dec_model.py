@@ -45,13 +45,17 @@ class ElectraNartPosDecModel(nn.Module):
 
     def forward(
             self,
-            src_tokens, prev_output_tokens, **kwargs
+            src_tokens, **kwargs
     ):
         src_masks = self.prepare_masks(src_tokens)
         electra_out = self.electra(input_ids=src_tokens, attention_mask=src_masks)
         electra_out = electra_out.hidden_states
+        '''
+            electra_out.len: 13
+            electra_out[0].size: [batch, seq_len, hidden]
+        '''
         if 1 == self.args.dec_layers:
-            electra_out = [electra_out[-1]]
+            electra_out = (electra_out[0], electra_out[-1])
 
         '''
             x = decoder_inputs,
