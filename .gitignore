@@ -23,4 +23,4 @@ __pycache__
 ckpt-**
 
 # Test results
-./results
+results/
