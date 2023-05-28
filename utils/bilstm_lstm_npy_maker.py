@@ -11,7 +11,7 @@ random.seed(42)
 from typing import Dict, List
 
 from kocharelectra_tokenization import KoCharElectraTokenizer
-from definition.data_def import KT_TTS
+from definition.data_def import KT_TTS, MECAB_POS_TAG
 from hangul_utils import split_syllables, join_jamos
 
 import platform
@@ -19,7 +19,6 @@ if "Windows" == platform.system():
     from eunjeon import Mecab # Windows
 else:
     from konlpy.tag import Mecab # Linux
-from definition.data_def import MECAB_POS_TAG
 
 #========================================================
 class LstmEncDecNpyMaker:
@@ -179,9 +178,9 @@ class LstmEncDecNpyMaker:
                                        return_tensors="np", truncation=True)
 
             # Check size
-            assert max_seq_len == len(raw_tokens["input_ids"][0]), f"ERR - input_ids, {len(raw_tokens['input_ids'])}"
+            assert max_seq_len == len(raw_tokens["input_ids"][0]), f"ERR - input_ids"
             assert max_seq_len == len(raw_tokens["attention_mask"][0]), "ERR - attention_mask"
-            assert max_seq_len == len(raw_tokens["token_type_ids"][0]), "ERR - tokent_type_ids"
+            assert max_seq_len == len(raw_tokens["token_type_ids"][0]), "ERR - token_type_ids"
             assert max_seq_len == len(g2p_tokens["input_ids"][0]), "ERR - g2p_tokens"
             assert 70 == len(pos_list), "ERR - pos_ids"
 
