@@ -11,6 +11,7 @@ import pickle
 import os
 import re
 import glob
+import time
 from attrdict import AttrDict
 
 from tqdm import tqdm
@@ -186,25 +187,25 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
     eval_dataloader = DataLoader(eval_datasets, sampler=eval_sampler, batch_size=args.eval_batch_size)
     eval_pbar = tqdm(eval_dataloader)
 
-    starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
-    time_per_iteration = []
+    cuda_starter, cuda_ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+    cuda_times = []
+
+    start_time = time.time()
     model.eval()
     for batch in eval_pbar:
         with torch.no_grad():
             inputs = make_electra_only_dec_inputs(batch)
             inputs["mode"] = "eval"
 
-            starter.record()
+            cuda_starter.record()
             output = model(**inputs)
-            ender.record()
-
-            # Wait for gpu sync
-            curr_time = starter.elapsed_time(ender)
-            time_per_iteration.append(curr_time)
+            cuda_ender.record()
+            torch.cuda.synchronize()
+            cuda_times.append(cuda_starter.elapsed_time(cuda_ender) / 1000)
 
             word_ins = output['word_ins']['out'][0]
-            # word_ins = F.log_softmax(word_ins, -1)
-            word_ins = torch.argmax(word_ins, -1)
+            word_ins = F.log_softmax(word_ins, -1)
+            # word_ins = torch.argmax(word_ins, -1)
 
             loss = criterion(word_ins.view(-1, len(dec_vocab)), batch["tgt_tokens"].view(-1).to(args.device))
             eval_loss += loss.mean().item()
@@ -215,6 +216,7 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
         eval_steps += 1
         eval_pbar.set_description("Eval Loss - %.04f" % (eval_loss / eval_steps))
     # end loop
+    end_time = time.time()
 
     # Decode
     for src_tok, pred_tok, ans_tok in zip(batch_src_tok_list, pred_tok_list, ans_tok_list):
@@ -280,11 +282,12 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
 
     wer_score = hug_eval.load("wer").compute(predictions=candidates, references=references)
     per_score = hug_eval.load("cer").compute(predictions=candidates, references=references)
-    print(f"[run_electra_non_dec][evaluate] wer_score: {wer_score * 100}, size: {len(candidates)}")
-    print(f"[run_electra_non_dec][evaluate] per_score: {per_score * 100}, size: {len(candidates)}")
-    print(f"[run_electra_non_dec][evaluate] s_acc: {total_correct / len(eval_datasets) * 100}, size: {total_correct}, "
+    print(f"[run_electra_art_dec][evaluate] wer_score: {wer_score * 100}, size: {len(candidates)}")
+    print(f"[run_electra_art_dec][evaluate] per_score: {per_score * 100}, size: {len(candidates)}")
+    print(f"[run_electra_art_dec][evaluate] s_acc: {total_correct / len(eval_datasets) * 100}, size: {total_correct}, "
           f"total.size: {len(eval_datasets)}")
-    # print(f"[run_electra_non_dec][evaluate] Elapsed time: {eval_end_time - eval_start_time} seconds")
+    print(f"[run_electra_art_dec][evaluate] Elapsed time: {end_time - start_time} seconds")
+    print(f"[run_electra_art_dec][evaluate] GPU Time: {sum(cuda_times)} seconds")
 
     logger.info("---Eval End !")
     eval_pbar.close()
@@ -303,7 +306,8 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
         f_w.write("  wer = {}\n".format(wer_score))
         f_w.write("  per = {}\n".format(per_score))
         f_w.write("  acc = {}\n".format(total_correct / len(eval_datasets)))
-        # f_w.write("  Elapsed time: {} seconds".format(eval_end_time - eval_start_time))
+        f_w.write("  Elapsed time: {} seconds".format(end_time - start_time))
+        f_w.write("  GPU time: {} seconds".format(sum(cuda_times)))
 
     # wrong case
     wrong_df = pd.DataFrame(wrong_case)
@@ -390,7 +394,7 @@ def main(config_path: str, custom_vocab_path: str, our_sam_path: str):
             model.load_state_dict(torch.load(checkpoint + '/model.pt'))
             model.to(config.device)
 
-            evaluate(config, model, test_datasets, "test", src_vocab, src_vocab, global_step, our_sam_vocab)
+            evaluate(config, model, test_datasets, "test", src_vocab, dec_vocab, global_step, our_sam_vocab)
 
 ### MAIN ###
 if '__main__' == __name__:

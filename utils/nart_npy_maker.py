@@ -89,6 +89,8 @@ class NartNpyMaker:
             'input_ids': [],
             'attention_mask': [],
             'token_type_ids': [],
+            'src_lengths': [],
+            'prev_output_tokens': [],
             'labels': []
         }
         except_output_pron_list = []  # (음절) 발음열을 따로 사용할 경우에만 데이터가 채워짐
@@ -117,6 +119,9 @@ class NartNpyMaker:
             if len(src_data.sent) != len(tgt_data.sent):
                 except_output_pron_list.append((src_data.id, src_data.sent, tgt_data.sent))
                 continue
+
+            if 0 == (r_idx % 5000):
+                print(f'[nart_npy_maker][_tokenization] {r_idx} is processing...')
 
             total_sent_size += len(src_data.sent)
             if max_sent_size < len(src_data.sent):
@@ -162,10 +167,17 @@ class NartNpyMaker:
             assert max_seq_len == len(src_tokens['attention_mask'][0]), 'ERR - attention_mask.size'
             assert max_seq_len == len(src_tokens['token_type_ids'][0]), 'ERR - token_type_ids.size'
 
+            # Make src_lengths
+            cls_idx = np.where(src_tokens['input_ids'][0] == tokenizer.encode('[CLS]')[1])[0][0]
+            sep_idx = np.where(src_tokens['input_ids'][0] == tokenizer.encode('[SEP]')[1])[0][0]
+            src_lengths = len(src_tokens['input_ids'][0][cls_idx:sep_idx + 1])
+
             # Insert to npy_dict
             npy_dict['input_ids'].append(src_tokens['input_ids'][0])
             npy_dict['attention_mask'].append(src_tokens['attention_mask'][0])
             npy_dict['token_type_ids'].append(src_tokens['token_type_ids'][0])
+            npy_dict['src_lengths'].append(src_lengths)
+            npy_dict['prev_output_tokens'].append(src_tokens['input_ids'][0])
 
         # (음절) 발음열 사전을 사용할 경우 예외에 대한 출력
         print("[NartNpyMaker][_tokenization] (음절) 발음열 사전 사용시 오류가 발생한 문장")
@@ -175,7 +187,7 @@ class NartNpyMaker:
         print(f"[NartNpyMaker][_tokenization] sent_max_len: {max_sent_size}, "
               f"mean_sent_len: {total_sent_size / len(src_data_list)}")
 
-        print(f"[NartNpyMaker][_tokenization] max_eojeol_size: {max_eojeol_size}")
+        print(f"[NartNpyMaker][_tokenization] max_eojeol_size: {max_eojeol_size}, sent_max_len: {sent_max_len}")
 
         return npy_dict
 
@@ -193,58 +205,75 @@ class NartNpyMaker:
         npy_dict["attention_mask"] = np.array(npy_dict["attention_mask"])
         npy_dict["token_type_ids"] = np.array(npy_dict["token_type_ids"])
         npy_dict["labels"] = np.array(npy_dict["labels"])
+        npy_dict['src_lengths'] = np.array(npy_dict['src_lengths'])
+        npy_dict['prev_output_tokens'] = np.array(npy_dict['prev_output_tokens'])
 
         # Train
         train_input_ids = npy_dict["input_ids"][:dev_s_idx]
         train_attention_mask = npy_dict["attention_mask"][:dev_s_idx]
         train_token_type_ids = npy_dict["token_type_ids"][:dev_s_idx]
         train_labels = npy_dict["labels"][:dev_s_idx]
+        train_src_lengths = npy_dict['src_lengths'][:dev_s_idx]
+        train_prev_output_tokens = npy_dict['prev_output_tokens'][:dev_s_idx]
 
         print(f"[LstmEncDecNpyMaker][_save_npy] Train.shape\ninput_ids: {train_input_ids.shape},"
               f"attention_mask: {train_attention_mask.shape}, token_type_ids: {train_token_type_ids.shape},"
-              f"labels.shape: {train_labels.shape}")
+              f"labels.shape: {train_labels.shape}, src_lengths: {train_src_lengths.shape},\n"
+              f"prev_output_tokens: {train_prev_output_tokens.shape}")
 
         # Dev
         dev_input_ids = npy_dict["input_ids"][dev_s_idx:dev_e_idx]
         dev_attention_mask = npy_dict["attention_mask"][dev_s_idx:dev_e_idx]
         dev_token_type_ids = npy_dict["token_type_ids"][dev_s_idx:dev_e_idx]
         dev_labels = npy_dict["labels"][dev_s_idx:dev_e_idx]
+        dev_src_lengths = npy_dict['src_lengths'][dev_s_idx:dev_e_idx]
+        dev_prev_output_tokens = npy_dict['prev_output_tokens'][dev_s_idx:dev_e_idx]
 
         print(f"[LstmEncDecNpyMaker][_save_npy] Dev.shape\ninput_ids: {dev_input_ids.shape},"
               f"attention_mask: {dev_attention_mask.shape}, token_type_ids: {dev_token_type_ids.shape},"
-              f"labels.shape: {dev_labels.shape}")
+              f"labels.shape: {dev_labels.shape}, src_lengths: {dev_src_lengths},\n"
+              f"prev_output_tokens: {dev_prev_output_tokens.shape}")
 
         # Test
         test_input_ids = npy_dict["input_ids"][dev_e_idx:]
         test_attention_mask = npy_dict["attention_mask"][dev_e_idx:]
         test_token_type_ids = npy_dict["token_type_ids"][dev_e_idx:]
         test_labels = npy_dict["labels"][dev_e_idx:]
+        test_src_lengths = npy_dict['src_lengths'][dev_e_idx:]
+        test_prev_output_tokens = npy_dict['prev_output_tokens'][dev_e_idx:]
 
         print(f"[LstmEncDecNpyMaker][_save_npy] Test.shape\ninput_ids: {test_input_ids.shape},"
               f"attention_mask: {test_attention_mask.shape}, token_type_ids: {test_token_type_ids.shape},"
-              f"labels.shape: {test_labels.shape}")
+              f"labels.shape: {test_labels.shape}, src_lengths.shape: {test_src_lengths.shape},\n"
+              f"prev_output_tokens: {test_prev_output_tokens.shape}")
 
         # Save
         np.save(save_path + "/train_src_tokens", train_input_ids)
         np.save(save_path + "/train_attention_mask", train_attention_mask)
         np.save(save_path + "/train_token_type_ids", train_token_type_ids)
         np.save(save_path + "/train_target", train_labels)
+        np.save(save_path + "/train_src_lengths", train_src_lengths)
+        np.save(save_path + "/train_prev_output_tokens", train_prev_output_tokens)
 
         np.save(save_path + "/dev_src_tokens", dev_input_ids)
         np.save(save_path + "/dev_attention_mask", dev_attention_mask)
         np.save(save_path + "/dev_token_type_ids", dev_token_type_ids)
         np.save(save_path + "/dev_target", dev_labels)
+        np.save(save_path + "/dev_src_lengths", dev_src_lengths)
+        np.save(save_path + "/dev_prev_output_tokens", dev_prev_output_tokens)
 
         np.save(save_path + "/test_src_tokens", test_input_ids)
         np.save(save_path + "/test_attention_mask", test_attention_mask)
         np.save(save_path + "/test_token_type_ids", test_token_type_ids)
         np.save(save_path + "/test_target", test_labels)
+        np.save(save_path + "/test_src_lengths", test_src_lengths)
+        np.save(save_path + "/test_prev_output_tokens", test_prev_output_tokens)
 
 ### MAIN ###
 if '__main__' == __name__:
     print(f'[nart_npy_maker][__main__] MAIN !')
 
-    nart_npy_maker = NartNpyMaker(b_debug_mode=False, b_use_custom_vocab=False)
+    nart_npy_maker = NartNpyMaker(b_debug_mode=False, b_use_custom_vocab=True)
     nart_npy_maker.make_nart_npy(
         src_path='../data/kor/pkl/kor_source_filter.pkl',
         tgt_path='../data/kor/pkl/kor_target.pkl',

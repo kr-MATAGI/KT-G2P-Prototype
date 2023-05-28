@@ -178,24 +178,22 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
     eval_dataloader = DataLoader(eval_datasets, sampler=eval_sampler, batch_size=args.eval_batch_size)
     eval_pbar = tqdm(eval_dataloader)
 
-    start_time = time.time()
-    starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
-    time_per_iteration = []
+    cuda_starter, cuda_ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+    cuda_times = []
+
     model.eval()
+    start_time = time.time()
     for batch in eval_pbar:
         torch.cuda.synchronize()
         with torch.no_grad():
             inputs = make_electra_only_dec_inputs(batch)
             inputs["mode"] = "eval"
 
-            # starter.record()
+            cuda_starter.record()
             output = model(**inputs)
-            # ender.record()
-
-            # Wait for gpu sync
-            # torch.cuda.synchronize()
-            # curr_time = starter.elapsed_time(ender)
-            # time_per_iteration.append(curr_time)
+            cuda_ender.record()
+            torch.cuda.synchronize()
+            cuda_times.append(cuda_starter.elapsed_time(cuda_ender) / 1000)
 
             output = F.log_softmax(output, -1)
             loss = criterion(output.reshape(-1, len(dec_vocab)), batch["tgt_tokens"].view(-1).to(args.device))
@@ -275,11 +273,12 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
 
     wer_score = hug_eval.load("wer").compute(predictions=candidates, references=references)
     per_score = hug_eval.load("cer").compute(predictions=candidates, references=references)
-    print(f"[run_electra_non_dec][evaluate] wer_score: {wer_score * 100}, size: {len(candidates)}")
-    print(f"[run_electra_non_dec][evaluate] per_score: {per_score * 100}, size: {len(candidates)}")
-    print(f"[run_electra_non_dec][evaluate] s_acc: {total_correct / len(eval_datasets) * 100}, size: {total_correct}, "
+    print(f"[run_nart_pos_dec][evaluate] wer_score: {wer_score * 100}, size: {len(candidates)}")
+    print(f"[run_nart_pos_dec][evaluate] per_score: {per_score * 100}, size: {len(candidates)}")
+    print(f"[run_nart_pos_dec][evaluate] s_acc: {total_correct / len(eval_datasets) * 100}, size: {total_correct}, "
           f"total.size: {len(eval_datasets)}")
-    print(f"[run_electra_non_dec][evaluate] Elapsed time: {end_time - start_time} seconds")
+    print(f"[run_nart_pos_dec][evaluate] Elapsed time: {end_time - start_time} seconds")
+    print(f'[run_nart_pos_dec][evaluate] CUDA time: {sum(cuda_times)} seconds')
 
     logger.info("---Eval End !")
     eval_pbar.close()
@@ -298,7 +297,8 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
         f_w.write("  wer = {}\n".format(wer_score))
         f_w.write("  per = {}\n".format(per_score))
         f_w.write("  acc = {}\n".format(total_correct / len(eval_datasets)))
-        # f_w.write("  Elapsed time: {} seconds".format(eval_end_time - eval_start_time))
+        f_w.write("  Elapsed time: {} seconds\n".format(end_time - start_time))
+        f_w.write("  GPU time: {} seconds".format(sum(cuda_times)))
 
     # wrong case
     wrong_df = pd.DataFrame(wrong_case)

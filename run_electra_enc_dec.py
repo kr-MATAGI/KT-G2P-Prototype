@@ -38,7 +38,7 @@ logger = init_logger()
 
 #========================================
 def evaluate(args, model, tokenizer, eval_dataset, mode,
-             output_vocab: Dict[str, int], our_sam_dict: Dict[str, str], global_steps: int):
+             output_vocab: Dict[str, int], our_sam_dict: Dict[str, str], global_steps: str):
 #========================================
     # init
     eval_sampler = SequentialSampler(eval_dataset)
@@ -67,13 +67,13 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
     pred_list = []
     ans_list = []
 
-    ''' 우리말 샘 문자열-발음열 처리 위해서 '''
-    pos_list = []
-
     criterion = nn.CrossEntropyLoss()
     eval_pbar = tqdm(eval_dataloader)
-    eval_start_time = time.time()
 
+    eval_start_time = time.time()
+    cuda_starter = torch.cuda.Event(enable_timing=True)
+    cuda_ender = torch.cuda.Event(enable_timing=True)
+    cuda_times = []
     for batch in eval_pbar:
         model.eval()
 
@@ -81,14 +81,19 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
             inputs = make_inputs_from_batch(batch, device=args.device)
             inputs["mode"] = "eval"
 
+            cuda_starter.record()
             logits = model(**inputs)  # predict [batch, seq_len] List
+            cuda_ender.record()
+            torch.cuda.synchronize()
+
+            cuda_times.append(cuda_starter.elapsed_time(cuda_ender) / 1000)
+
             loss = criterion(logits.view(-1, args.out_vocab_size), inputs["labels"].view(-1).to(args.device))
             eval_loss += loss.mean().item()
 
             inputs_list.append(inputs["input_ids"].detach().cpu())
             pred_list.append(torch.argmax(logits, dim=-1).detach().cpu())
             ans_list.append(inputs["labels"].detach().cpu())
-            # pos_list.append(inputs["pos_ids"].detach().cpu())
 
         nb_eval_steps += 1
         eval_pbar.set_description("Eval Loss - %.04f" % (eval_loss / nb_eval_steps))
@@ -176,12 +181,13 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
 
     wer_score = hug_eval.load("wer").compute(predictions=candidates, references=references)
     per_score = hug_eval.load("cer").compute(predictions=candidates, references=references)
-    print(f"[run_g2p][evaluate] wer_score: {wer_score * 100}, size: {len(candidates)}")
-    print(f"[run_g2p][evaluate] per_score: {per_score * 100}, size: {len(candidates)}")
-    print(f"[run_g2p][evaluate] s_acc: {total_correct/len(eval_dataset) * 100}, size: {total_correct}, "
+    print(f"[run_electra_enc_dec][evaluate] wer_score: {wer_score * 100}, size: {len(candidates)}")
+    print(f"[run_electra_enc_dec][evaluate] per_score: {per_score * 100}, size: {len(candidates)}")
+    print(f"[run_electra_enc_dec][evaluate] s_acc: {total_correct/len(eval_dataset) * 100}, size: {total_correct}, "
           f"total.size: {len(eval_dataset)}")
-    print(f"[run_g2p][evaluate] Elapsed time: {eval_end_time - eval_start_time} seconds")
-    print(f"[run_g2p][evaluate] our_sam change count: {change_count}")
+    print(f"[run_electra_enc_dec][evaluate] Elapsed time: {eval_end_time - eval_start_time} seconds")
+    print(f'[run_electra_enc_dec][evaluate] GPU Time: {sum(cuda_times)} seconds')
+    print(f"[run_electra_enc_dec][evaluate] our_sam change count: {change_count}")
 
     eval_pbar.close()
 
