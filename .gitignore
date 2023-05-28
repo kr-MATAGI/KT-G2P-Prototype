@@ -20,7 +20,7 @@ __pycache__
 # Model
 *.bin
 *.pt
-ckpt-**/
+ckpt-**
 
 # Test results
 ./results
