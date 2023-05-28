@@ -118,14 +118,7 @@ class TransformerS2Model(FairseqEncoderDecoderModel):
         if not hasattr(args, 'max_target_positions'):
             args.max_target_positions = DEFAULT_MAX_TARGET_POSITIONS
 
-        # 2020.04.07 - JAEHOON
-        # src_dict, tgt_dict = task.source_dictionary, task.target_dictionary
         src_dict, tgt_dict = source_dict, target_dict
-
-        # 2020.04.07 - JAEHOON
-        # if len(task.datasets) > 0:
-        #     src_electratokenizer = next(iter(task.datasets.values())).berttokenizer
-        # else:
         src_berttokenizer = KoCharElectraTokenizer.from_pretrained("monologg/kocharelectra-base-discriminator")
 
         def build_embedding(dictionary, embed_dim, path=None):

@@ -32,6 +32,8 @@ if "Windows" == platform.system():
 else:
     from konlpy.tag import Mecab # Linux
 
+import time
+
 ### GLOBAL
 logger = init_logger()
 tokenizer = KoCharElectraTokenizer.from_pretrained('monologg/kocharelectra-base-discriminator')
@@ -184,6 +186,7 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
     eval_dataloader = DataLoader(eval_datasets, sampler=eval_sampler, batch_size=args.eval_batch_size)
     eval_pbar = tqdm(eval_dataloader)
 
+    start_time = time.time()
     starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
     time_per_iteration = []
     model.eval()
@@ -215,6 +218,7 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
         eval_steps += 1
         eval_pbar.set_description("Eval Loss - %.04f" % (eval_loss / eval_steps))
     # end loop
+    end_time = time.time()
 
     # Decode
     for src_tok, pred_tok, ans_tok in zip(batch_src_tok_list, pred_tok_list, ans_tok_list):

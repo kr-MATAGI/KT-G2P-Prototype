@@ -32,6 +32,8 @@ if "Windows" == platform.system():
 else:
     from konlpy.tag import Mecab # Linux
 
+import time
+
 ### GLOBAL
 logger = init_logger()
 tokenizer = KoCharElectraTokenizer.from_pretrained('monologg/kocharelectra-base-discriminator')
@@ -176,6 +178,7 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
     eval_dataloader = DataLoader(eval_datasets, sampler=eval_sampler, batch_size=args.eval_batch_size)
     eval_pbar = tqdm(eval_dataloader)
 
+    start_time = time.time()
     starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
     time_per_iteration = []
     model.eval()
@@ -185,27 +188,28 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
             inputs = make_electra_only_dec_inputs(batch)
             inputs["mode"] = "eval"
 
-            starter.record()
+            # starter.record()
             output = model(**inputs)
-            ender.record()
+            # ender.record()
 
             # Wait for gpu sync
-            torch.cuda.synchronize()
-            curr_time = starter.elapsed_time(ender)
-            time_per_iteration.append(curr_time)
+            # torch.cuda.synchronize()
+            # curr_time = starter.elapsed_time(ender)
+            # time_per_iteration.append(curr_time)
 
             output = F.log_softmax(output, -1)
             loss = criterion(output.reshape(-1, len(dec_vocab)), batch["tgt_tokens"].view(-1).to(args.device))
 
             eval_loss += loss.mean().item()
 
-            batch_src_tok_list.append(inputs["src_tokens"].detach().cpu())
-            pred_tok_list.append(torch.argmax(output, -1).detach().cpu())
-            ans_tok_list.append(batch["tgt_tokens"].detach().cpu())
+            # batch_src_tok_list.append(inputs["src_tokens"].detach().cpu())
+            # pred_tok_list.append(torch.argmax(output, -1).detach().cpu())
+            # ans_tok_list.append(batch["tgt_tokens"].detach().cpu())
 
         eval_steps += 1
         eval_pbar.set_description("Eval Loss - %.04f" % (eval_loss / eval_steps))
     # end loop
+    end_time = time.time()
 
     # Decode
     for src_tok, pred_tok, ans_tok in zip(batch_src_tok_list, pred_tok_list, ans_tok_list):
@@ -275,7 +279,7 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
     print(f"[run_electra_non_dec][evaluate] per_score: {per_score * 100}, size: {len(candidates)}")
     print(f"[run_electra_non_dec][evaluate] s_acc: {total_correct / len(eval_datasets) * 100}, size: {total_correct}, "
           f"total.size: {len(eval_datasets)}")
-    print(f"[run_electra_non_dec][evaluate] Elapsed time: {sum(time_per_iteration) / len(time_per_iteration) * 1000} seconds")
+    print(f"[run_electra_non_dec][evaluate] Elapsed time: {end_time - start_time} seconds")
 
     logger.info("---Eval End !")
     eval_pbar.close()

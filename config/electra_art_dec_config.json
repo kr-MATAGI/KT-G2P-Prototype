@@ -1,7 +1,7 @@
 {
   "task": "custom",
   "data_dir": "data",
-  "ckpt_dir": "ckpt-electra-ar-decoder-1-layer",
+  "ckpt_dir": "ckpt-electra-ar-decoder-6-layer",
   "train_npy": "./data/kor/npy/only_dec/train.npy",
   "dev_npy": "./data/kor/npy/only_dec/dev.npy",
   "test_npy": "./data/kor/npy/only_dec/test.npy",
@@ -21,7 +21,7 @@
   "max_grad_norm": 1.0,
   "model_type": "electra-base",
   "model_name_or_path": "monologg/kocharelectra-base-discriminator",
-  "output_dir": "electra-ar-decoder-1-layer",
+  "output_dir": "electra-ar-decoder-6-layer",
   "seed": 42,
   "train_batch_size": 64,
   "eval_batch_size": 1,
@@ -30,7 +30,7 @@
   "learning_rate": 5e-5,
   "device": "cuda",
   "use_custom_vocab": true,
-  "dec_layers": 1,
+  "dec_layers": 6,
   "syllable_constraint_vocab": "./data/post_method/jaso_filter.json",
   "do_post_method": false,
   "use_our_sam": false

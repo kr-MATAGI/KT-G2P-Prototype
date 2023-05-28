@@ -1,7 +1,7 @@
 {
   "task": "custom",
   "data_dir": "data",
-  "ckpt_dir": "ckpt-electra-non-decoder-1-layer",
+  "ckpt_dir": "ckpt-electra-non-decoder-6-layer",
   "train_npy": "./data/kor/npy/only_dec/train.npy",
   "dev_npy": "./data/kor/npy/only_dec/dev.npy",
   "test_npy": "./data/kor/npy/only_dec/test.npy",
@@ -21,7 +21,7 @@
   "max_grad_norm": 1.0,
   "model_type": "electra-base",
   "model_name_or_path": "monologg/kocharelectra-base-discriminator",
-  "output_dir": "electra-non-decoder-1-layer",
+  "output_dir": "electra-non-decoder-6-layer",
   "seed": 42,
   "train_batch_size": 64,
   "eval_batch_size": 1,
