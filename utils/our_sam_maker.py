@@ -3,15 +3,14 @@ import os
 import pickle
 import re
 
-from typing import List
-from definition.data_def import KrStdDict, OurSamDict, ConjuInfo
+from definition.data_def import KrStdDict, OurSamDict, ConjuInfo, WordInfo
 
 import xml.etree.ElementTree as ET
+from typing import List, Dict
 
-
-# ===================================
+#===================================
 class OurSamMaker:
-    # ===================================
+#===================================
     def __init__(self):
         print("[OurSamMaker][__init__]")
 
@@ -221,9 +220,9 @@ class OurSamMaker:
         return root
 
 
-# ===================================
+#===================================
 class StdDictMaker:
-    # ===================================
+#===================================
     def __init__(self):
         print("[StdDictMaker][__init__]")
 
@@ -284,12 +283,57 @@ class StdDictMaker:
                  5 < len(x)])
         return dict_data
 
+#======================================================
+class OurSamMerger:
+#======================================================
+    def __init__(self):
+        print(f'[OurSamMerger][__init__] INIT !')
+
+    def merge_kor_eng_dict(
+            self,
+            kor_path: str, eng_path: str
+    ):
+        # init
+        print(f'[OurSamMerger][merge_kor_eng_dict] kor_path: {kor_path}\neng_path: {eng_path}')
+
+        ret_merged_dict = {}
+
+        # Load *.pkl
+        kor_dict: Dict[str, List] = None
+        eng_dict: List[WordInfo] = None
+        with open(kor_path, mode='rb') as k_f:
+            kor_dict = pickle.load(k_f)
+            print(f'[OurSamMerger][merge_kor_eng_dict] kor_dict.size: {len(kor_dict)}')
+            print(list(kor_dict.items())[:10])
+        with open(eng_path, mode='rb') as e_f:
+            eng_dict = pickle.load(e_f)
+            print(f'[OurSamMerger][merge_kor_eng_dict] eng_dict.size: {len(eng_dict)}')
+            print(f'{eng_dict[:10]}')
+
+        # Add - kor word
+        for k_key, k_val in kor_dict.items():
+            ret_merged_dict[k_key] = k_val
+        print(f'[OurSamMerger][merge_kor_eng_dict] Add kor, ret_merge_dict.size: {len(ret_merged_dict.keys())}')
+
+        # Add - etc word
+        duplicated_cnt = 0
+        for eng_item in eng_dict:
+            if eng_item.word in ret_merged_dict.keys():
+                duplicated_cnt += 1
+                # print(eng_item)
+            elif 0 < len(eng_item.pronunciation) and 0 < len(eng_item.word):
+                ret_merged_dict[eng_item.word] = eng_item.pronunciation
+        print(f'[OurSamMerger][merge_kor_eng_dict] Add eng, ret_merge_dict.size: {len(ret_merged_dict.keys())}')
+        print(f'[OurSamMerger][merge_kor_eng_dict] duplicated_cnt: {duplicated_cnt}')
+
+        return ret_merged_dict
 
 ### MAIN ###
 if "__main__" == __name__:
     print("[dict_maker] __main__")
 
-    is_make_our_sam_dict = True
+    is_make_our_sam_dict = False
+    is_merge_kor_eng = True
 
     if is_make_our_sam_dict:
         our_sam_maker = OurSamMaker()
@@ -301,3 +345,17 @@ if "__main__" == __name__:
         dict_save_path = "../data/our_sam_filter_dict.json"
         with open(dict_save_path, mode="w", encoding="utf-8") as f:
             json.dump(our_sam_dict, f, ensure_ascii=False, indent=4)
+
+    if is_merge_kor_eng:
+        our_sam_merger = OurSamMerger()
+        merged_our_sam_dict = our_sam_merger.merge_kor_eng_dict(
+            kor_path='../data/dictionary/our_sam_std_dict.pkl',
+            eng_path='../data/dictionary/dictionary.pkl'
+        )
+
+        # save merge_dict
+        save_path = '../data/dictionary/merged_kor_eng_info.pkl'
+        with open(save_path, mode="wb") as merge_f:
+            pickle.dump(merged_our_sam_dict, merge_f)
+            print(f'[our_sam_maker][__main__] Complete svae - {save_path}')
+            print(f'[our_sam_maker][__main__] merged_dict.size: {len(merged_our_sam_dict)}')
