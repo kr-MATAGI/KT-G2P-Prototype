@@ -200,7 +200,7 @@ class KorEngDataMerger:
     def make_lstm_npy(
             self,
             data_path: str, save_path: str, ori_test_npy_path: str,
-            b_use_custom_vocab: bool, custom_vocab_path: str,
+            b_use_custom_vocab: bool, custom_vocab_path: str, b_stack_ori_npy: bool,
             max_seq_len: int = 256
     ):
         print(f'[KorEngDataMerger][make_lstm_npy] data_path: {data_path}\nsave_path: {save_path}')
@@ -229,14 +229,19 @@ class KorEngDataMerger:
         tokenizer = KoCharElectraTokenizer.from_pretrained('monologg/kocharelectra-base-discriminator')
 
         # Load origin test npy files
-        ori_input_ids_np = np.load(ori_test_npy_path + '/test_input_ids.npy')
-        ori_attn_mask_np = np.load(ori_test_npy_path + '/test_attention_mask.npy')
-        ori_token_type_ids_np = np.load(ori_test_npy_path + '/test_token_type_ids.npy')
-        ori_labels_np = np.load(ori_test_npy_path + '/test_labels.npy')
+        ori_input_ids_np = []
+        ori_attn_mask_np = []
+        ori_token_type_ids_np = []
+        ori_labels_np = []
+        if b_stack_ori_npy:
+            ori_input_ids_np = np.load(ori_test_npy_path + '/test_input_ids.npy')
+            ori_attn_mask_np = np.load(ori_test_npy_path + '/test_attention_mask.npy')
+            ori_token_type_ids_np = np.load(ori_test_npy_path + '/test_token_type_ids.npy')
+            ori_labels_np = np.load(ori_test_npy_path + '/test_labels.npy')
 
-        print(f'[KorEngDataMerger][make_lstm_npy] ori_test_npy files shape:')
-        print(f'ori_input_ids_np: {ori_input_ids_np.shape}, ori_labels_np: {ori_labels_np.shape}')
-        print(f'ori_attn_mask_np: {ori_attn_mask_np.shape}, ori_token_type_ids_np: {ori_token_type_ids_np.shape}')
+            print(f'[KorEngDataMerger][make_lstm_npy] ori_test_npy files shape:')
+            print(f'ori_input_ids_np: {ori_input_ids_np.shape}, ori_labels_np: {ori_labels_np.shape}')
+            print(f'ori_attn_mask_np: {ori_attn_mask_np.shape}, ori_token_type_ids_np: {ori_token_type_ids_np.shape}')
 
         # Tokenization
         for idx, (id, _, conv_src_sent, tgt_sent) in enumerate(eng_sent_data):
@@ -258,11 +263,23 @@ class KorEngDataMerger:
 
             assert max_seq_len == len(labels), f'ERR - labels.size: {len(labels)}'
 
-            ori_input_ids_np = np.vstack((ori_input_ids_np, input_ids))
-            ori_attn_mask_np = np.vstack((ori_attn_mask_np, attn_mask))
-            ori_token_type_ids_np = np.vstack((ori_token_type_ids_np, token_type_ids))
-            ori_labels_np = np.vstack((ori_labels_np, labels))
+            if b_stack_ori_npy:
+                ori_input_ids_np = np.vstack((ori_input_ids_np, input_ids))
+                ori_attn_mask_np = np.vstack((ori_attn_mask_np, attn_mask))
+                ori_token_type_ids_np = np.vstack((ori_token_type_ids_np, token_type_ids))
+                ori_labels_np = np.vstack((ori_labels_np, labels))
+            else:
+                ori_input_ids_np.append(input_ids)
+                ori_attn_mask_np.append(attn_mask)
+                ori_token_type_ids_np.append(token_type_ids)
+                ori_labels_np.append(labels)
         # end loop, Tokenization
+
+        if not b_stack_ori_npy:
+            ori_input_ids_np = np.array(ori_input_ids_np)
+            ori_attn_mask_np = np.array(ori_attn_mask_np)
+            ori_token_type_ids_np = np.array(ori_token_type_ids_np)
+            ori_labels_np = np.array(ori_labels_np)
 
         print(f'[KorEngDataMerger][make_lstm_npy] Complete eng tokens stack processing...')
         print(f'ori_input_ids_np: {ori_input_ids_np.shape}, ori_labels_np: {ori_labels_np.shape}')
@@ -274,7 +291,6 @@ class KorEngDataMerger:
         np.save(save_path + '/test_token_type_ids', ori_token_type_ids_np)
         np.save(save_path + '/test_labels', ori_labels_np)
         print(f'[KorEngDataMerger][make_lstm_npy] Save Npy files - {save_path}')
-
 
 ### MAIN ###
 if '__main__' == __name__:
@@ -312,5 +328,6 @@ if '__main__' == __name__:
         save_path='../data/eng_kor/npy/lstm',
         ori_test_npy_path='../data/kor/npy/lstm',
         b_use_custom_vocab=True, custom_vocab_path='../data/vocab/pron_eumjeol_vocab.json',
+        b_stack_ori_npy=True,
         max_seq_len=256
     )

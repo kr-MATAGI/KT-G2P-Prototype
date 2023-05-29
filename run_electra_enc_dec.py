@@ -426,8 +426,11 @@ def main(config_path: str,
 
         for checkpoint in checkpoints:
             global_step = checkpoint.split("-")[-1]
+            ckpt_config = ElectraConfig.from_pretrained(checkpoint)
+            ckpt_config.do_post_method = config.do_post_method
             model = ElectraStdPronRules.from_pretrained(checkpoint, tokenizer=tokenizer, out_tag2ids=decoder_vocab,
-                                                        out_ids2tag=decoder_ids2tag, jaso_pair_dict=post_proc_dict)
+                                                        out_ids2tag=decoder_ids2tag, jaso_pair_dict=post_proc_dict,
+                                                        config=ckpt_config)
             model.to(args.device)
             evaluate(args, model, tokenizer, test_datasets, mode="test",
                      output_vocab=decoder_vocab, our_sam_dict=our_sam_dict, global_steps=global_step)
