@@ -52,7 +52,8 @@ def load_electra_transformer_decoder_npy(src_path, mode: str):
 
     print(f"[run_utils][load_bert_fused_npy] {mode} npy shape:")
     print(f"src_tokens: {src_tokens.shape}, attn_mask: {attn_mask.shape}")
-    print(f"target: {target.shape}")
+    print(f"target: {target.shape}, src_lengths: {src_lengths.shape}")
+    print(f'prev_output_tokens: {prev_output_tokens.shape}')
 
     inputs = {
         "src_tokens": src_tokens,
@@ -89,7 +90,6 @@ class ElectraOnlyDecDataset(Dataset):
         assert len(self.src_tokens) == len(self.attn_mask), 'ERR - attn_mask'
         assert len(self.src_tokens) == len(self.target), 'ERR - target'
         assert len(self.src_tokens) == len(self.prev_output_tokens), 'ERR - prev_output_tokens'
-
 
     def __len__(self):
         return len(self.src_tokens)
