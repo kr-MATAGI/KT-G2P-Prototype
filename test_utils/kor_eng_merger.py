@@ -183,7 +183,7 @@ class KorEngDataMerger:
             ori_target_np = np.vstack((ori_target_np, target))
         # end loop, Tokenization
 
-        print(f'[KorEngDataMerger][make_nart_npy] Complete eng tokens stack processing...:')
+        print(f'[KorEngDataMerger][make_nart_npy] Complete eng tokens stack processing...')
         print(f'src_tokens: {ori_src_tokens_np.shape}, src_lengths: {ori_src_lengths_np.shape}')
         print(f'ori_attn_mask_np: {ori_attn_mask_np.shape}, ori_token_type_ids_np: {ori_token_type_ids_np.shape}')
         print(f'ori_prev_output_tokens_np: {ori_prev_output_tokens_np.shape}, ori_target_np: {ori_target_np.shape}')
@@ -196,6 +196,85 @@ class KorEngDataMerger:
         np.save(save_path + '/test_prev_output_tokens', ori_prev_output_tokens_np)
         np.save(save_path + '/test_target', ori_target_np)
         print(f'[KorEngDataMerger][make_nart_npy] Save Npy Files - {save_path}')
+
+    def make_lstm_npy(
+            self,
+            data_path: str, save_path: str, ori_test_npy_path: str,
+            b_use_custom_vocab: bool, custom_vocab_path: str,
+            max_seq_len: int = 256
+    ):
+        print(f'[KorEngDataMerger][make_lstm_npy] data_path: {data_path}\nsave_path: {save_path}')
+        print(f'[KorEngDataMerger][make_lstm_npy] ori_test_npy_path: {ori_test_npy_path}')
+
+        if not os.path.exists(data_path):
+            raise Exception(f'ERR - Not Existed: {data_path}')
+        if not os.path.exists(ori_test_npy_path):
+            raise Exception(f'ERR - Not Existed: {ori_test_npy_path}')
+        if b_use_custom_vocab and not os.path.exists(custom_vocab_path):
+            raise Exception(f'ERR - Not Existed: {custom_vocab_path}')
+
+        custom_vocab = None
+        if b_use_custom_vocab:
+            with open(custom_vocab_path, mode='r', encoding='utf-8') as cv_f:
+                custom_vocab = json.load(cv_f)
+                print(f'[KorEngDataMerger][make_lstm_npy] custom_vocab.size: {len(custom_vocab)}')
+                print(list(custom_vocab.items())[:10])
+
+        eng_sent_data = []
+        with open(data_path, mode='rb') as d_f:
+            eng_sent_data = pickle.load(d_f)
+        print(f'[KorEngDataMerger][make_lstm_npy] eng_sent_data.size: {len(eng_sent_data)}')
+
+        # Make *.npy files
+        tokenizer = KoCharElectraTokenizer.from_pretrained('monologg/kocharelectra-base-discriminator')
+
+        # Load origin test npy files
+        ori_input_ids_np = np.load(ori_test_npy_path + '/test_input_ids.npy')
+        ori_attn_mask_np = np.load(ori_test_npy_path + '/test_attention_mask.npy')
+        ori_token_type_ids_np = np.load(ori_test_npy_path + '/test_token_type_ids.npy')
+        ori_labels_np = np.load(ori_test_npy_path + '/test_labels.npy')
+
+        print(f'[KorEngDataMerger][make_lstm_npy] ori_test_npy files shape:')
+        print(f'ori_input_ids_np: {ori_input_ids_np.shape}, ori_labels_np: {ori_labels_np.shape}')
+        print(f'ori_attn_mask_np: {ori_attn_mask_np.shape}, ori_token_type_ids_np: {ori_token_type_ids_np.shape}')
+
+        # Tokenization
+        for idx, (id, _, conv_src_sent, tgt_sent) in enumerate(eng_sent_data):
+            conv_src_res = tokenizer(conv_src_sent,
+                                     padding="max_length", max_length=max_seq_len,
+                                     return_tensors='np', truncation=True)
+            input_ids = conv_src_res['input_ids'][0]
+            attn_mask = conv_src_res['attention_mask'][0]
+            token_type_ids = conv_src_res['token_type_ids'][0]
+
+            labels = [custom_vocab[x] for x in list(tgt_sent)]
+            labels.insert(0, custom_vocab['[CLS]'])
+            if max_seq_len <= len(labels):
+                labels = labels[:max_seq_len - 1]
+                labels.append(custom_vocab['[SEP]'])
+            else:
+                labels.append(custom_vocab['[SEP]'])
+                labels += [custom_vocab['[PAD]']] * (max_seq_len - len(labels))
+
+            assert max_seq_len == len(labels), f'ERR - labels.size: {len(labels)}'
+
+            ori_input_ids_np = np.vstack((ori_input_ids_np, input_ids))
+            ori_attn_mask_np = np.vstack((ori_attn_mask_np, attn_mask))
+            ori_token_type_ids_np = np.vstack((ori_token_type_ids_np, token_type_ids))
+            ori_labels_np = np.vstack((ori_labels_np, labels))
+        # end loop, Tokenization
+
+        print(f'[KorEngDataMerger][make_lstm_npy] Complete eng tokens stack processing...')
+        print(f'ori_input_ids_np: {ori_input_ids_np.shape}, ori_labels_np: {ori_labels_np.shape}')
+        print(f'ori_attn_mask_np: {ori_attn_mask_np.shape}, ori_token_type_ids_np: {ori_token_type_ids_np.shape}')
+
+        # Save
+        np.save(save_path + '/test_input_ids', ori_input_ids_np)
+        np.save(save_path + '/test_attention_mask', ori_attn_mask_np)
+        np.save(save_path + '/test_token_type_ids', ori_token_type_ids_np)
+        np.save(save_path + '/test_labels', ori_labels_np)
+        print(f'[KorEngDataMerger][make_lstm_npy] Save Npy files - {save_path}')
+
 
 ### MAIN ###
 if '__main__' == __name__:
@@ -222,8 +301,16 @@ if '__main__' == __name__:
     # make to npy
     kor_eng_data_merger.make_nart_npy(
         data_path='../data/eng_kor/pkl/eng2kor_sent.pkl',
-        save_path='../data/eng_kor/npy',
+        save_path='../data/eng_kor/npy/only_dec',
         ori_test_npy_path='../data/kor/npy/only_dec',
         b_use_custom_vocab=False, custom_vocab_path='../data/vocab/pron_eumjeol_vocab.json',
+        max_seq_len=256
+    )
+
+    kor_eng_data_merger.make_lstm_npy(
+        data_path='../data/eng_kor/pkl/eng2kor_sent.pkl',
+        save_path='../data/eng_kor/npy/lstm',
+        ori_test_npy_path='../data/kor/npy/lstm',
+        b_use_custom_vocab=True, custom_vocab_path='../data/vocab/pron_eumjeol_vocab.json',
         max_seq_len=256
     )
