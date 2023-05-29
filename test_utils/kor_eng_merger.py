@@ -113,6 +113,7 @@ class KorEngDataMerger:
             self,
             data_path: str, save_path: str, ori_test_npy_path: str,
             b_use_custom_vocab: bool, custom_vocab_path: str,
+            b_stack_ori_npy: bool,
             max_seq_len: int=256
     ):
         print(f'[KorEngDataMerger][make_nart_npy] data_path: {data_path}\nsave_path: {save_path}')
@@ -141,17 +142,25 @@ class KorEngDataMerger:
         tokenizer = KoCharElectraTokenizer.from_pretrained('monologg/kocharelectra-base-discriminator')
 
         # Load origin test npy files
-        ori_src_tokens_np = np.load(ori_test_npy_path + '/test_src_tokens.npy')
-        ori_src_lengths_np = np.load(ori_test_npy_path + '/test_src_lengths.npy')
-        ori_attn_mask_np = np.load(ori_test_npy_path + '/test_attention_mask.npy')
-        ori_token_type_ids_np = np.load(ori_test_npy_path + '/test_token_type_ids.npy')
-        ori_prev_output_tokens_np = np.load(ori_test_npy_path + '/test_prev_output_tokens.npy')
-        ori_target_np = np.load(ori_test_npy_path + '/test_target.npy')
+        ori_src_tokens_np = []
+        ori_src_lengths_np = []
+        ori_attn_mask_np = []
+        ori_token_type_ids_np = []
+        ori_prev_output_tokens_np = []
+        ori_target_np = []
 
-        print(f'[KorEngDataMerger][make_nart_npy] ori_test_npy files shape:')
-        print(f'src_tokens: {ori_src_tokens_np.shape}, src_lengths: {ori_src_lengths_np.shape}')
-        print(f'ori_attn_mask_np: {ori_attn_mask_np.shape}, ori_token_type_ids_np: {ori_token_type_ids_np.shape}')
-        print(f'ori_prev_output_tokens_np: {ori_prev_output_tokens_np.shape}, ori_target_np: {ori_target_np.shape}')
+        if b_stack_ori_npy:
+            ori_src_tokens_np = np.load(ori_test_npy_path + '/test_src_tokens.npy')
+            ori_src_lengths_np = np.load(ori_test_npy_path + '/test_src_lengths.npy')
+            ori_attn_mask_np = np.load(ori_test_npy_path + '/test_attention_mask.npy')
+            ori_token_type_ids_np = np.load(ori_test_npy_path + '/test_token_type_ids.npy')
+            ori_prev_output_tokens_np = np.load(ori_test_npy_path + '/test_prev_output_tokens.npy')
+            ori_target_np = np.load(ori_test_npy_path + '/test_target.npy')
+
+            print(f'[KorEngDataMerger][make_nart_npy] ori_test_npy files shape:')
+            print(f'src_tokens: {ori_src_tokens_np.shape}, src_lengths: {ori_src_lengths_np.shape}')
+            print(f'ori_attn_mask_np: {ori_attn_mask_np.shape}, ori_token_type_ids_np: {ori_token_type_ids_np.shape}')
+            print(f'ori_prev_output_tokens_np: {ori_prev_output_tokens_np.shape}, ori_target_np: {ori_target_np.shape}')
 
         # Tokenization
         for idx, (id, _, conv_src_sent, tgt_sent) in enumerate(eng_sent_data):
@@ -175,13 +184,29 @@ class KorEngDataMerger:
             token_type_ids = conv_src_res['token_type_ids'][0]
             target = tgt_res['input_ids'][0]
 
-            ori_src_tokens_np = np.vstack((ori_src_tokens_np, src_token))
-            ori_src_lengths_np = np.hstack((ori_src_lengths_np, src_len))
-            ori_attn_mask_np = np.vstack((ori_attn_mask_np, attn_mask))
-            ori_token_type_ids_np = np.vstack((ori_token_type_ids_np, token_type_ids))
-            ori_prev_output_tokens_np = np.vstack((ori_prev_output_tokens_np, src_token))
-            ori_target_np = np.vstack((ori_target_np, target))
+            if b_stack_ori_npy:
+                ori_src_tokens_np = np.vstack((ori_src_tokens_np, src_token))
+                ori_src_lengths_np = np.hstack((ori_src_lengths_np, src_len))
+                ori_attn_mask_np = np.vstack((ori_attn_mask_np, attn_mask))
+                ori_token_type_ids_np = np.vstack((ori_token_type_ids_np, token_type_ids))
+                ori_prev_output_tokens_np = np.vstack((ori_prev_output_tokens_np, src_token))
+                ori_target_np = np.vstack((ori_target_np, target))
+            else:
+                ori_src_tokens_np.append(src_token)
+                ori_src_lengths_np.append(src_len)
+                ori_attn_mask_np.append(attn_mask)
+                ori_token_type_ids_np.append(token_type_ids)
+                ori_prev_output_tokens_np.append(src_token)
+                ori_target_np.append(target)
         # end loop, Tokenization
+
+        if not b_stack_ori_npy:
+            ori_src_tokens_np = np.array(ori_src_tokens_np)
+            ori_src_lengths_np = np.array(ori_src_lengths_np)
+            ori_attn_mask_np = np.array(ori_attn_mask_np)
+            ori_token_type_ids_np = np.array(ori_token_type_ids_np)
+            ori_prev_output_tokens_np = np.array(ori_prev_output_tokens_np)
+            ori_target_np = np.array(ori_target_np)
 
         print(f'[KorEngDataMerger][make_nart_npy] Complete eng tokens stack processing...')
         print(f'src_tokens: {ori_src_tokens_np.shape}, src_lengths: {ori_src_lengths_np.shape}')
@@ -320,6 +345,7 @@ if '__main__' == __name__:
         save_path='../data/eng_kor/npy/only_dec',
         ori_test_npy_path='../data/kor/npy/only_dec',
         b_use_custom_vocab=False, custom_vocab_path='../data/vocab/pron_eumjeol_vocab.json',
+        b_stack_ori_npy=False,
         max_seq_len=256
     )
 
