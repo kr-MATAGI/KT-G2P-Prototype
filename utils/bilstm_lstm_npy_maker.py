@@ -35,9 +35,12 @@ class LstmEncDecNpyMaker:
         print(f"[LstmEncDecNpyMaker][__init__] b_convert_pronounce: {self.b_convert_pronounce}, "
               f"b_debug_mod: {self.b_debug_mode}")
 
-    def make_bilstm_lstm_npy(self, raw_path: str, g2p_path: str,
-                             save_path: str, out_vocab_path: str,
-                             max_seq_len: int=256):
+    def make_bilstm_lstm_npy(
+            self,
+            raw_path: str, g2p_path: str,
+            save_path: str, out_vocab_path: str,
+            max_seq_len: int=256
+    ):
         print(f"[LstmEncDecNpyMaker][make_bilstm_lstm_npy] raw_data: {raw_path},\ng2p_path: {g2p_path}")
         print(f"[LstmEncDecNpyMaker][make_bilstm_lstm_npy] out_vocab_path:{out_vocab_path}")
 
@@ -104,15 +107,13 @@ class LstmEncDecNpyMaker:
         for root_idx, (raw_data, g2p_data) in enumerate(zip(raw_data_list, g2p_data_list)):
             raw_data.sent = raw_data.sent.strip()
             g2p_data.sent = g2p_data.sent.strip()
+
             if not re.match(r"[가-힣]+", raw_data.sent):
                 except_output_pron_list.append((raw_data.id, raw_data.sent, g2p_data.sent))
                 continue
             if re.search(r"[ㄱ-ㅎ]+", raw_data.sent) or re.search(r'[ㅏ-ㅣ]+', raw_data.sent):
                 except_output_pron_list.append((raw_data.id, raw_data.sent, g2p_data.sent))
                 continue
-
-            if 0 == (root_idx % 1000):
-                print(f"[LstmEncDecNpyMaker][make_kt_tts_npy] {root_idx} is processing... {raw_data.sent}")
 
             if raw_data.id != g2p_data.id:
                 raise Exception(f"ERR - ID diff, raw_data: {raw_data.id}, g2p_data: {g2p_data.id}")
@@ -121,6 +122,9 @@ class LstmEncDecNpyMaker:
             if len(raw_data.sent) != len(g2p_data.sent):
                 except_output_pron_list.append((raw_data.id, raw_data.sent, g2p_data.sent))
                 continue
+
+            if 0 == (root_idx % 1000):
+                print(f"[LstmEncDecNpyMaker][make_kt_tts_npy] {root_idx} is processing... {raw_data.sent}")
 
             total_sent_len += len(raw_data.sent)
             if sent_max_len < len(raw_data.sent):
