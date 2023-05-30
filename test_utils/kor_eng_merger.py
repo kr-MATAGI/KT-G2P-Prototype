@@ -354,6 +354,6 @@ if '__main__' == __name__:
         save_path='../data/eng_kor/npy/lstm',
         ori_test_npy_path='../data/kor/npy/lstm',
         b_use_custom_vocab=True, custom_vocab_path='../data/vocab/pron_eumjeol_vocab.json',
-        b_stack_ori_npy=True,
+        b_stack_ori_npy=False,
         max_seq_len=256
     )

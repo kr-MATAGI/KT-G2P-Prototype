@@ -191,6 +191,16 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
 
     eval_pbar.close()
 
+    ''' Save Wrong Case'''
+    with open('./results/bilstm_lstm/wrong_case.txt', mode='w', encoding='utf-8') as w_f:
+        for w_idx, (w_inp_s, w_candi_s, w_ref_s) in enumerate(zip(wrong_case['input_sent'],
+                                                                  wrong_case['candi_sent'], wrong_case['ref_sent'])):
+            w_f.write(str(w_idx)+'\n')
+            w_f.write(w_inp_s+'\n')
+            w_f.write(w_candi_s+'\n')
+            w_f.write(w_ref_s+'\n')
+            w_f.write('==================\n\n')
+
     ''' 우리말 샘 변경 사항 파일로 저장'''
     save_debug_txt("./results/bilstm_lstm/our_sam_debug.txt", our_sam_debug_list)
     save_debug_txt("./results/bilstm_lstm/fixed_our_sam_debug.txt", fixed_our_sam_list)

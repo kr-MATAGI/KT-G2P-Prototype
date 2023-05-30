@@ -212,6 +212,7 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
 
             batch_src_tok_list.append(inputs["src_tokens"].detach().cpu())
             pred_tok_list.append(torch.argmax(word_ins, -1).detach().cpu())
+
             ans_tok_list.append(batch["tgt_tokens"].detach().cpu())
         eval_steps += 1
         eval_pbar.set_description("Eval Loss - %.04f" % (eval_loss / eval_steps))

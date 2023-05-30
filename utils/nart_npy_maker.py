@@ -273,7 +273,7 @@ class NartNpyMaker:
 if '__main__' == __name__:
     print(f'[nart_npy_maker][__main__] MAIN !')
 
-    nart_npy_maker = NartNpyMaker(b_debug_mode=False, b_use_custom_vocab=True)
+    nart_npy_maker = NartNpyMaker(b_debug_mode=False, b_use_custom_vocab=False)
     nart_npy_maker.make_nart_npy(
         src_path='../data/kor/pkl/kor_source_filter.pkl',
         tgt_path='../data/kor/pkl/kor_target.pkl',
