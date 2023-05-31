@@ -2,7 +2,7 @@
   "ckpt_dir": "ckpt-electra-bilstm-lstm",
   "train_npy": "./data/kor/npy/lstm/train.npy",
   "dev_npy": "./data/kor/npy/lstm/dev.npy",
-  "test_npy": "./data/eng_kor/npy/lstm/test.npy",
+  "test_npy": "./data/kor/npy/lstm/test.npy",
   "evaluate_test_during_training": true,
   "eval_all_checkpoints": false,
   "save_optimizer": false,
@@ -26,6 +26,6 @@
   "learning_rate": 5e-5,
   "device": "cuda",
   "use_custom_vocab": true,
-  "do_post_method": false,
+  "do_post_method": true,
   "use_our_sam": false
 }
