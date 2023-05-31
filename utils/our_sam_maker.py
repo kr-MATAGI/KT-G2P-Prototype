@@ -359,3 +359,8 @@ if "__main__" == __name__:
             pickle.dump(merged_our_sam_dict, merge_f)
             print(f'[our_sam_maker][__main__] Complete svae - {save_path}')
             print(f'[our_sam_maker][__main__] merged_dict.size: {len(merged_our_sam_dict)}')
+
+        # to txt file
+        with open('../data/dictionary/merged_kor_eng_info.txt', mode='w', encoding='utf-8') as f:
+            for key, val in merged_our_sam_dict.items():
+                f.write(key + ':' + val[0] + '\n')
