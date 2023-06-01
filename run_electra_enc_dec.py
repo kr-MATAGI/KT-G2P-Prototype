@@ -447,7 +447,7 @@ def main(config_path: str,
 
 ### MAIN ###
 if "__main__" == __name__:
-    print("[run_g2p][__main__] MAIN !")
+    print("[run_electra_enc_dec][__main__] MAIN !")
 
     main(config_path="config/electra_bilstm_lstm.json",
          decoder_vocab_path="./data/vocab/pron_eumjeol_vocab.json",
