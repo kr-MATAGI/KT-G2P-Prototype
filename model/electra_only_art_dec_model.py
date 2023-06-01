@@ -45,7 +45,7 @@ import itertools
 from hangul_utils import split_syllables, join_jamos
 from typing import List
 
-class ElectraOnlyDecModel(nn.Module):
+class ElectraOnlyART(nn.Module):
     def __init__(self, decoder, bertencoder, berttokenizer, mask_cls_sep=False, args=None):
         super().__init__()
 

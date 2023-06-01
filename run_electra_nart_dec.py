@@ -15,7 +15,7 @@ from attrdict import AttrDict
 
 from tqdm import tqdm
 from transformers import get_linear_schedule_with_warmup
-from model.electra_only_nart_dec_model import ElectraOnlyDecModel
+from model.electra_only_nart_dec_model import ElectraOnlyNART
 
 from utils.kocharelectra_tokenization import KoCharElectraTokenizer
 from run_utils import (
@@ -359,7 +359,7 @@ def main(config_path: str, custom_vocab_path: str, our_sam_path: str):
     logger.info(list(our_sam_vocab.items())[:10])
 
     # Build Model
-    model = ElectraOnlyDecModel.build_model(config, source_dict=src_vocab, target_dict=dec_vocab)
+    model = ElectraOnlyNART.build_model(config, source_dict=src_vocab, target_dict=dec_vocab)
     model.to(config.device)
 
     # Do Train
@@ -393,7 +393,7 @@ def main(config_path: str, custom_vocab_path: str, our_sam_path: str):
 
         for checkpoint in checkpoints:
             global_step = checkpoint.split("-")[-1]
-            model = ElectraOnlyDecModel.build_model(config, source_dict=src_vocab, target_dict=dec_vocab)
+            model = ElectraOnlyNART.build_model(config, source_dict=src_vocab, target_dict=dec_vocab)
             model.load_state_dict(torch.load(checkpoint + '/model.pt'))
             model.to(config.device)
 
