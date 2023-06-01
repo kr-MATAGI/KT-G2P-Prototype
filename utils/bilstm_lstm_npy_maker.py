@@ -99,6 +99,7 @@ class LstmEncDecNpyMaker:
         # Loop
         sent_max_len = 0
         total_sent_len = 0
+        max_eojeol_size = 0
         for root_idx, (raw_data, g2p_data) in enumerate(zip(raw_data_list, g2p_data_list)):
             raw_data.sent = raw_data.sent.strip()
             g2p_data.sent = g2p_data.sent.strip()
