@@ -11,7 +11,7 @@ random.seed(42)
 from typing import Dict, List
 
 from kocharelectra_tokenization import KoCharElectraTokenizer
-from definition.data_def import KT_TTS, MECAB_POS_TAG
+from definition.data_def import KT_TTS
 from hangul_utils import split_syllables, join_jamos
 
 import platform
@@ -79,17 +79,12 @@ class LstmEncDecNpyMaker:
             "input_ids": [],
             "attention_mask": [],
             "token_type_ids": [],
-            "labels": [],
-            "pos_ids": []
+            "labels": []
         }
         except_output_pron_list = [] # (음절) 발음열을 따로 사용할 경우에만 데이터가 채워짐
 
         # init
         tokenizer = KoCharElectraTokenizer.from_pretrained(tokenizer_name)
-
-        max_eojeol_size = 0 # 70
-        mecab = Mecab()
-        pos_tag2ids = {v: k for k, v in MECAB_POS_TAG.items()}
 
         # 발음열 출력 사전
         if self.b_use_out_vocab:
@@ -132,26 +127,6 @@ class LstmEncDecNpyMaker:
             if max_eojeol_size < len(raw_data.sent.split(" ")):
                 max_eojeol_size = len(raw_data.sent.split(" "))
 
-            # Mecab
-            mecab_res = mecab.pos(raw_data.sent)
-            mecab_res = self._make_eojeol_mecab_res(raw_data.sent, mecab_res)
-
-            pos_list = [[0, 0, 0, 0, 0]]
-            for m_res in mecab_res:
-                p_set = []
-                for p in m_res:
-                    p_set.extend([pos_tag2ids[x] if x in pos_tag2ids.keys() else pos_tag2ids["O"] for x in p[-1]])
-                if 5 > len(p_set): # 최대로 저장할 pos 개수 : 5
-                    p_set.extend([pos_tag2ids["O"]] * (5 - len(p_set)))
-                else:
-                    p_set = p_set[:5]
-                pos_list.append(p_set)
-
-            if 70 > len(pos_list): # 최대 어절이 63~67
-                pos_list.extend([[0, 0, 0, 0, 0]] * (70 - len(pos_list)))
-            else:
-                pos_list = pos_list[:70]
-
             # For raw_data
             raw_tokens = tokenizer(raw_data.sent, padding="max_length", max_length=max_seq_len, return_tensors="np",
                                    truncation=True)
@@ -186,15 +161,12 @@ class LstmEncDecNpyMaker:
             assert max_seq_len == len(raw_tokens["attention_mask"][0]), "ERR - attention_mask"
             assert max_seq_len == len(raw_tokens["token_type_ids"][0]), "ERR - token_type_ids"
             assert max_seq_len == len(g2p_tokens["input_ids"][0]), "ERR - g2p_tokens"
-            assert 70 == len(pos_list), "ERR - pos_ids"
 
             # Insert npy_dict
             npy_dict["input_ids"].append(raw_tokens["input_ids"][0])
             npy_dict["attention_mask"].append(raw_tokens["attention_mask"][0])
             npy_dict["token_type_ids"].append(raw_tokens["token_type_ids"][0])
             npy_dict["labels"].append(g2p_tokens["input_ids"][0])
-            npy_dict["pos_ids"].append(pos_list)
-
 
         # (음절) 발음열 사전을 사용할 경우 예외에 대한 출력
         print("[LstmEncDecNpyMaker][make_kt_tts_npy] (음절) 발음열 사전 사용시 오류가 발생한 문장")
@@ -221,59 +193,54 @@ class LstmEncDecNpyMaker:
         npy_dict["attention_mask"] = np.array(npy_dict["attention_mask"])
         npy_dict["token_type_ids"] = np.array(npy_dict["token_type_ids"])
         npy_dict["labels"] = np.array(npy_dict["labels"])
-        npy_dict["pos_ids"] = np.array(npy_dict["pos_ids"])
 
         # Train
-        train_input_ids = npy_dict["input_ids"][:dev_s_idx]
-        train_attention_mask = npy_dict["attention_mask"][:dev_s_idx]
-        train_token_type_ids = npy_dict["token_type_ids"][:dev_s_idx]
-        train_labels = npy_dict["labels"][:dev_s_idx]
-        train_pos_ids = npy_dict["pos_ids"][:dev_s_idx]
-
-        print(f"[LstmEncDecNpyMaker][_save_npy] Train.shape\ninput_ids: {train_input_ids.shape},"
-              f"attention_mask: {train_attention_mask.shape}, token_type_ids: {train_token_type_ids.shape},"
-              f"labels.shape: {train_labels.shape}, pos_ids.shape: {train_pos_ids.shape}")
+        train_datasets = {
+            'input_ids': None,
+            'attention_mask': None,
+            'token_type_ids': None,
+            'labels': None
+        }
+        train_datasets['input_ids'] = npy_dict["input_ids"][:dev_s_idx]
+        train_datasets['attention_mask'] = npy_dict["attention_mask"][:dev_s_idx]
+        train_datasets['token_type_ids'] = npy_dict["token_type_ids"][:dev_s_idx]
+        train_datasets['labels'] = npy_dict["labels"][:dev_s_idx]
+        print(f"[KoCharNpyMaker][_save_npy] Train.shape\ninput_ids: {train_datasets['input_ids'].shape}, "
+              f"attention_mask: {train_datasets['attention_mask'].shape}, "
+              f"token_type_ids: {train_datasets['token_type_ids'].shape}, "
+              f"labels.shape: {train_datasets['labels'].shape}")
 
         # Dev
-        dev_input_ids = npy_dict["input_ids"][dev_s_idx:dev_e_idx]
-        dev_attention_mask = npy_dict["attention_mask"][dev_s_idx:dev_e_idx]
-        dev_token_type_ids = npy_dict["token_type_ids"][dev_s_idx:dev_e_idx]
-        dev_labels = npy_dict["labels"][dev_s_idx:dev_e_idx]
-        dev_pos_ids = npy_dict["pos_ids"][dev_s_idx:dev_e_idx]
-
-        print(f"[LstmEncDecNpyMaker][_save_npy] Dev.shape\ninput_ids: {dev_input_ids.shape},"
-              f"attention_mask: {dev_attention_mask.shape}, token_type_ids: {dev_token_type_ids.shape},"
-              f"labels.shape: {dev_labels.shape}, pos_ids.shape: {dev_pos_ids.shape}")
+        dev_datasets = {k: None for k in train_datasets.keys()}
+        dev_datasets['input_ids'] = npy_dict["input_ids"][dev_s_idx:dev_e_idx]
+        dev_datasets['attention_mask'] = npy_dict["attention_mask"][dev_s_idx:dev_e_idx]
+        dev_datasets['token_type_ids'] = npy_dict["token_type_ids"][dev_s_idx:dev_e_idx]
+        dev_datasets['labels'] = npy_dict["labels"][dev_s_idx:dev_e_idx]
+        print(f"[KoCharNpyMaker][_save_npy] Dev.shape\ninput_ids: {dev_datasets['input_ids'].shape}, "
+              f"attention_mask: {dev_datasets['attention_mask'].shape}, "
+              f"token_type_ids: {dev_datasets['token_type_ids'].shape}, "
+              f"labels.shape: {dev_datasets['labels'].shape}")
 
         # Test
-        test_input_ids = npy_dict["input_ids"][dev_e_idx:]
-        test_attention_mask = npy_dict["attention_mask"][dev_e_idx:]
-        test_token_type_ids = npy_dict["token_type_ids"][dev_e_idx:]
-        test_labels = npy_dict["labels"][dev_e_idx:]
-        test_pos_ids = npy_dict["pos_ids"][dev_e_idx:]
-
-        print(f"[LstmEncDecNpyMaker][_save_npy] Test.shape\ninput_ids: {test_input_ids.shape},"
-              f"attention_mask: {test_attention_mask.shape}, token_type_ids: {test_token_type_ids.shape},"
-              f"labels.shape: {test_labels.shape}, pos_ids.shape: {test_pos_ids.shape}")
+        test_datasets = {k: None for k in dev_datasets.keys()}
+        test_datasets['input_ids'] = npy_dict["input_ids"][dev_e_idx:]
+        test_datasets['attention_mask'] = npy_dict["attention_mask"][dev_e_idx:]
+        test_datasets['token_type_ids'] = npy_dict["token_type_ids"][dev_e_idx:]
+        test_datasets['labels'] = npy_dict["labels"][dev_e_idx:]
+        print(f"[KoCharNpyMaker][_save_npy] Test.shape\ninput_ids: {test_datasets['input_ids'].shape}, "
+              f"attention_mask: {test_datasets['attention_mask'].shape}, "
+              f"token_type_ids: {test_datasets['token_type_ids'].shape}, "
+              f"labels.shape: {test_datasets['labels'].shape}")
 
         # Save
-        np.save(save_path + "/train_input_ids", train_input_ids)
-        np.save(save_path + "/train_attention_mask", train_attention_mask)
-        np.save(save_path + "/train_token_type_ids", train_token_type_ids)
-        np.save(save_path + "/train_labels", train_labels)
-        np.save(save_path + "/train_pos_ids", train_pos_ids)
+        for train_key, train_val in train_datasets.items():
+            np.save(save_path + '/train_' + train_key, train_val)
 
-        np.save(save_path + "/dev_input_ids", dev_input_ids)
-        np.save(save_path + "/dev_attention_mask", dev_attention_mask)
-        np.save(save_path + "/dev_token_type_ids", dev_token_type_ids)
-        np.save(save_path + "/dev_labels", dev_labels)
-        np.save(save_path + "/dev_pos_ids", dev_pos_ids)
+        for dev_key, dev_val in dev_datasets.items():
+            np.save(save_path + '/dev_' + dev_key, dev_val)
 
-        np.save(save_path + "/test_input_ids", test_input_ids)
-        np.save(save_path + "/test_attention_mask", test_attention_mask)
-        np.save(save_path + "/test_token_type_ids", test_token_type_ids)
-        np.save(save_path + "/test_labels", test_labels)
-        np.save(save_path + "/test_pos_ids", test_pos_ids)
+        for test_key, test_val in test_datasets.items():
+            np.save(save_path + '/test_' + test_key, test_val)
 
     def _tokenize_using_output_vocab(self, g2p_sent: str, tag2ids: Dict[str, int], max_seq_len: int):
         split_sent = list(g2p_sent)

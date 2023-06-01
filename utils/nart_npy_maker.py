@@ -198,7 +198,7 @@ class NartNpyMaker:
         split_ratio = 0.1
         dev_s_idx = int(total_size * (split_ratio * 8))
         dev_e_idx = int(dev_s_idx + (total_size * split_ratio))
-        print(f"[LstmEncDecNpyMaker][_save_npy] split_ratio: {split_ratio}, "
+        print(f"[NartNpyMaker][_save_npy] split_ratio: {split_ratio}, "
               f"dev_s_idx: {dev_s_idx}, dev_e_idx: {dev_e_idx}")
 
         npy_dict["input_ids"] = np.array(npy_dict["input_ids"])
@@ -209,65 +209,68 @@ class NartNpyMaker:
         npy_dict['prev_output_tokens'] = np.array(npy_dict['prev_output_tokens'])
 
         # Train
-        train_input_ids = npy_dict["input_ids"][:dev_s_idx]
-        train_attention_mask = npy_dict["attention_mask"][:dev_s_idx]
-        train_token_type_ids = npy_dict["token_type_ids"][:dev_s_idx]
-        train_labels = npy_dict["labels"][:dev_s_idx]
-        train_src_lengths = npy_dict['src_lengths'][:dev_s_idx]
-        train_prev_output_tokens = npy_dict['prev_output_tokens'][:dev_s_idx]
+        train_datasets = {
+            'src_tokens': None,
+            'attention_mask': None,
+            'token_type_ids': None,
+            'target': None,
+            'src_lengths': None,
+            'prev_output_tokens': None,
+        }
+        train_datasets['src_tokens'] = npy_dict["input_ids"][:dev_s_idx]
+        train_datasets['attention_mask'] = npy_dict["attention_mask"][:dev_s_idx]
+        train_datasets['token_type_ids'] = npy_dict["token_type_ids"][:dev_s_idx]
+        train_datasets['target'] = npy_dict["labels"][:dev_s_idx]
+        train_datasets['src_lengths'] = npy_dict['src_lengths'][:dev_s_idx]
+        train_datasets['prev_output_tokens'] = npy_dict['prev_output_tokens'][:dev_s_idx]
 
-        print(f"[LstmEncDecNpyMaker][_save_npy] Train.shape\ninput_ids: {train_input_ids.shape},"
-              f"attention_mask: {train_attention_mask.shape}, token_type_ids: {train_token_type_ids.shape},"
-              f"labels.shape: {train_labels.shape}, src_lengths: {train_src_lengths.shape},\n"
-              f"prev_output_tokens: {train_prev_output_tokens.shape}")
+        print(f"[NartNpyMaker][_save_npy] Train.shape\ninput_ids: {train_datasets['src_tokens'].shape}, "
+              f"attention_mask: {train_datasets['attention_mask'].shape}, "
+              f"token_type_ids: {train_datasets['token_type_ids'].shape}, "
+              f"labels.shape: {train_datasets['target'].shape}, "
+              f"src_lengths: {train_datasets['src_lengths'].shape},\n"
+              f"prev_output_tokens: {train_datasets['prev_output_tokens'].shape}")
 
         # Dev
-        dev_input_ids = npy_dict["input_ids"][dev_s_idx:dev_e_idx]
-        dev_attention_mask = npy_dict["attention_mask"][dev_s_idx:dev_e_idx]
-        dev_token_type_ids = npy_dict["token_type_ids"][dev_s_idx:dev_e_idx]
-        dev_labels = npy_dict["labels"][dev_s_idx:dev_e_idx]
-        dev_src_lengths = npy_dict['src_lengths'][dev_s_idx:dev_e_idx]
-        dev_prev_output_tokens = npy_dict['prev_output_tokens'][dev_s_idx:dev_e_idx]
+        dev_datasets = {k: [] for k in train_datasets.keys()}
+        dev_datasets['src_tokens'] = npy_dict["input_ids"][dev_s_idx:dev_e_idx]
+        dev_datasets['attention_mask'] = npy_dict["attention_mask"][dev_s_idx:dev_e_idx]
+        dev_datasets['token_type_ids'] = npy_dict["token_type_ids"][dev_s_idx:dev_e_idx]
+        dev_datasets['target'] = npy_dict["labels"][dev_s_idx:dev_e_idx]
+        dev_datasets['src_lengths'] = npy_dict['src_lengths'][dev_s_idx:dev_e_idx]
+        dev_datasets['prev_output_tokens'] = npy_dict['prev_output_tokens'][dev_s_idx:dev_e_idx]
 
-        print(f"[LstmEncDecNpyMaker][_save_npy] Dev.shape\ninput_ids: {dev_input_ids.shape},"
-              f"attention_mask: {dev_attention_mask.shape}, token_type_ids: {dev_token_type_ids.shape},"
-              f"labels.shape: {dev_labels.shape}, src_lengths: {dev_src_lengths},\n"
-              f"prev_output_tokens: {dev_prev_output_tokens.shape}")
+        print(f"[NartNpyMaker][_save_npy] Dev.shape\ninput_ids: {dev_datasets['src_tokens'].shape}, "
+              f"attention_mask: {dev_datasets['attention_mask'].shape}, "
+              f"token_type_ids: {dev_datasets['token_type_ids'].shape}, "
+              f"labels.shape: {dev_datasets['target'].shape}, src_lengths: {dev_datasets['src_lengths']},\n"
+              f"prev_output_tokens: {dev_datasets['prev_output_tokens'].shape}")
 
         # Test
-        test_input_ids = npy_dict["input_ids"][dev_e_idx:]
-        test_attention_mask = npy_dict["attention_mask"][dev_e_idx:]
-        test_token_type_ids = npy_dict["token_type_ids"][dev_e_idx:]
-        test_labels = npy_dict["labels"][dev_e_idx:]
-        test_src_lengths = npy_dict['src_lengths'][dev_e_idx:]
-        test_prev_output_tokens = npy_dict['prev_output_tokens'][dev_e_idx:]
+        test_datasets = {k: [] for k in dev_datasets.keys()}
+        test_datasets['src_tokens'] = npy_dict["input_ids"][dev_e_idx:]
+        test_datasets['attention_mask'] = npy_dict["attention_mask"][dev_e_idx:]
+        test_datasets['token_type_ids'] = npy_dict["token_type_ids"][dev_e_idx:]
+        test_datasets['target'] = npy_dict["labels"][dev_e_idx:]
+        test_datasets['src_lengths'] = npy_dict['src_lengths'][dev_e_idx:]
+        test_datasets['prev_output_tokens'] = npy_dict['prev_output_tokens'][dev_e_idx:]
 
-        print(f"[LstmEncDecNpyMaker][_save_npy] Test.shape\ninput_ids: {test_input_ids.shape},"
-              f"attention_mask: {test_attention_mask.shape}, token_type_ids: {test_token_type_ids.shape},"
-              f"labels.shape: {test_labels.shape}, src_lengths.shape: {test_src_lengths.shape},\n"
-              f"prev_output_tokens: {test_prev_output_tokens.shape}")
+        print(f"[NartNpyMaker][_save_npy] Test.shape\ninput_ids: {test_datasets['src_tokens'].shape}, "
+              f"attention_mask: {test_datasets['attention_mask'].shape}, "
+              f"token_type_ids: {test_datasets['token_type_ids'].shape}, "
+              f"labels.shape: {test_datasets['target'].shape}, "
+              f"src_lengths.shape: {test_datasets['src_lengths'].shape}, "
+              f"prev_output_tokens: {test_datasets['prev_output_tokens'].shape}")
 
         # Save
-        np.save(save_path + "/train_src_tokens", train_input_ids)
-        np.save(save_path + "/train_attention_mask", train_attention_mask)
-        np.save(save_path + "/train_token_type_ids", train_token_type_ids)
-        np.save(save_path + "/train_target", train_labels)
-        np.save(save_path + "/train_src_lengths", train_src_lengths)
-        np.save(save_path + "/train_prev_output_tokens", train_prev_output_tokens)
+        for train_key, train_val in train_datasets.items():
+            np.save(save_path + '/train_' + train_key, train_val)
 
-        np.save(save_path + "/dev_src_tokens", dev_input_ids)
-        np.save(save_path + "/dev_attention_mask", dev_attention_mask)
-        np.save(save_path + "/dev_token_type_ids", dev_token_type_ids)
-        np.save(save_path + "/dev_target", dev_labels)
-        np.save(save_path + "/dev_src_lengths", dev_src_lengths)
-        np.save(save_path + "/dev_prev_output_tokens", dev_prev_output_tokens)
+        for dev_key, dev_val in dev_datasets.items():
+            np.save(save_path + '/dev_' + dev_key, dev_val)
 
-        np.save(save_path + "/test_src_tokens", test_input_ids)
-        np.save(save_path + "/test_attention_mask", test_attention_mask)
-        np.save(save_path + "/test_token_type_ids", test_token_type_ids)
-        np.save(save_path + "/test_target", test_labels)
-        np.save(save_path + "/test_src_lengths", test_src_lengths)
-        np.save(save_path + "/test_prev_output_tokens", test_prev_output_tokens)
+        for test_key, test_val in test_datasets.items():
+            np.save(save_path + '/test_' + test_key, test_val)
 
 ### MAIN ###
 if '__main__' == __name__:
