@@ -25,14 +25,12 @@ class LstmEncDecNpyMaker:
 #========================================================
     def __init__(self,
                  b_debug_mode: bool=False,
-                 b_convert_pronounce: bool=False):
+                 b_use_out_vocab: bool=False):
         print("[LstmEncDecNpyMaker] __init__ !")
 
         self.b_use_out_vocab = False
-
-        self.b_convert_pronounce = b_convert_pronounce
         self.b_debug_mode = b_debug_mode
-        print(f"[LstmEncDecNpyMaker][__init__] b_convert_pronounce: {self.b_convert_pronounce}, "
+        print(f"[LstmEncDecNpyMaker][__init__] b_use_out_vocab: {self.b_use_out_vocab}, "
               f"b_debug_mod: {self.b_debug_mode}")
 
     def make_bilstm_lstm_npy(
@@ -51,6 +49,9 @@ class LstmEncDecNpyMaker:
 
         if os.path.exists(out_vocab_path):
             self.b_use_out_vocab = True
+        else:
+            self.b_use_out_vocab = False
+            print(f'[LstmEncDecNpyMaker][make_bilstm_lstm_npy] Not Existed - out_vocab_path !')
 
         # Load Raw Data
         all_raw_data = all_g2p_data = []
@@ -294,9 +295,9 @@ class LstmEncDecNpyMaker:
 
 ### MAIN ###
 if "__main__" == __name__:
-    lstm_npy_maker = LstmEncDecNpyMaker(b_convert_pronounce=False, b_debug_mode=False)
+    lstm_npy_maker = LstmEncDecNpyMaker(b_use_out_vocab=True, b_debug_mode=False)
 
-    lstm_npy_maker.make_bilstm_lstm_npy(raw_path="../data/kor/pkl/kor_source_filter.pkl",
+    lstm_npy_maker. make_bilstm_lstm_npy(raw_path="../data/kor/pkl/kor_source_filter.pkl",
                                         g2p_path="../data/kor/pkl/kor_target.pkl",
                                         save_path="../data/kor/npy/lstm",
                                         out_vocab_path="../data/vocab/pron_eumjeol_vocab.json")
