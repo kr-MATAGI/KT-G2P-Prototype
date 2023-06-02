@@ -1,12 +1,10 @@
 import copy
 import os
 import re
-import pickle
 import json
 import numpy as np
 
 from typing import List, Dict
-from definition.data_def import KT_TTS
 from utils.kocharelectra_tokenization import KoCharElectraTokenizer
 
 #=================================================================
