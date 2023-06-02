@@ -12,7 +12,7 @@ from typing import Dict, List
 
 from kocharelectra_tokenization import KoCharElectraTokenizer
 from definition.data_def import KT_TTS
-from hangul_utils import split_syllables, join_jamos
+from utils.error_fixer import ERR_SENT_ID_FIXED
 
 import platform
 if "Windows" == platform.system():
@@ -135,11 +135,21 @@ class LstmEncDecNpyMaker:
 
             # For g2p_data
             ''' 발음열 문장에서 '였' '것' 같은 오류의 종성을 'ㄷ'으로 처리 '''
+
+            if g2p_data.id in ERR_SENT_ID_FIXED.keys():
+                print(f'[LstmEncDecNpyMaker][_tokenization] ERR DETECTED -> {g2p_data.id}, {g2p_data.sent}')
+                print(f'[LstmEncDecNpyMaker][_tokenization] {ERR_SENT_ID_FIXED[g2p_data.id]}')
+                g2p_data.sent = g2p_data.sent.replace(ERR_SENT_ID_FIXED[g2p_data.id][0],
+                                                      ERR_SENT_ID_FIXED[g2p_data.id][1])
+                print(f'[LstmEncDecNpyMaker][_tokenization] ERR FIXED -> {g2p_data.sent}')
+
+            '''    
             for g_idx, g2p_item in enumerate(g2p_data.sent):
                 g2p_jaso = list(split_syllables(g2p_item))
                 if 3 == len(g2p_jaso) and ('ㅅ' == g2p_jaso[-1] or 'ㅆ' == g2p_jaso[-1]):
                     g2p_jaso[-1] = 'ㄷ'
                     g2p_data.sent = g2p_data.sent.replace(g2p_item, join_jamos("".join(g2p_jaso)))
+            '''
 
             if self.b_use_out_vocab:
                 g2p_tokens = {"input_ids": []}

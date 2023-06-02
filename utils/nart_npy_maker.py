@@ -11,8 +11,8 @@ random.seed(42)
 from typing import Dict, List
 
 from kocharelectra_tokenization import KoCharElectraTokenizer
-from definition.data_def import KT_TTS, MECAB_POS_TAG
-from hangul_utils import split_syllables, join_jamos
+from definition.data_def import KT_TTS
+from utils.error_fixer import ERR_SENT_ID_FIXED
 
 import platform
 if 'Windows' == platform.system():
@@ -134,6 +134,14 @@ class NartNpyMaker:
                                    return_tensors='np', truncation=True)
 
             # Tokenization tgt_data
+            if tgt_data.id in ERR_SENT_ID_FIXED.keys():
+                print(f'[NartNpyMaker][_tokenization] ERR DETECTED -> {tgt_data.id}, {tgt_data.sent}')
+                print(f'[NartNpyMaker][_tokenization] {ERR_SENT_ID_FIXED[tgt_data.id]}')
+                tgt_data.sent = tgt_data.sent.replace(ERR_SENT_ID_FIXED[tgt_data.id][0],
+                                                      ERR_SENT_ID_FIXED[tgt_data.id][1])
+                print(f'[NartNpyMaker][_tokenization] ERR FIXED -> {tgt_data.sent}')
+
+            '''
             for t_idx, tgt_eumjeol in enumerate(tgt_data.sent):
                 tgt_jaso = list(split_syllables(tgt_eumjeol))
                 if 3 == len(tgt_jaso) and ('ㅅ' == tgt_jaso[-1] or 'ㅆ' == tgt_jaso[-1]):
@@ -142,6 +150,7 @@ class NartNpyMaker:
                     tgt_jaso[-1] = 'ㄷ'
                     tgt_data.sent = tgt_data.sent.replace(tgt_eumjeol, join_jamos(''.join(tgt_jaso)))
                     print(f'[NartNpyMaker][_tokenization] {join_jamos("".join(tgt_jaso))}')
+            '''
 
             if self.b_use_custom_vocab:
                 split_tgt = list(tgt_data.sent)
