@@ -181,6 +181,7 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
 
     wer_score = hug_eval.load("wer").compute(predictions=candidates, references=references)
     per_score = hug_eval.load("cer").compute(predictions=candidates, references=references)
+    print(f"[run_electra_enc_dec][evaluate] global_steps: {global_steps}")
     print(f"[run_electra_enc_dec][evaluate] wer_score: {wer_score * 100}, size: {len(candidates)}")
     print(f"[run_electra_enc_dec][evaluate] per_score: {per_score * 100}, size: {len(candidates)}")
     print(f"[run_electra_enc_dec][evaluate] s_acc: {total_correct/len(eval_dataset) * 100}, size: {total_correct}, "

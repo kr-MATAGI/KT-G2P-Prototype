@@ -1,15 +1,18 @@
 import os
-
+import re
 import torch
 from torch.utils.data import Dataset
+import numpy as np
 
-import json
+import pickle
 import logging
 import copy
 import random
 import numpy as np
 
-from typing import Dict, Optional, List
+from typing import Dict, List
+from definition.data_def import KT_TTS
+from utils.error_fixer import ERR_SENT_ID_FIXED, ERR_SENT_CHANGED_FIXED
 
 #===============================================================
 def init_logger():
@@ -126,9 +129,89 @@ def make_eojeol_mecab_res(input_sent: str, mecab_res: List):
     return total_eojeol_morp
 
 #==================================================
-def make_digits_ensemble_data(data_path: str, mode: str):
+def make_digits_ensemble_data(
+        data_path: str, mode: str,
+        tokenizer, decode_vocab, max_seq_len: int=256
+):
 #==================================================
     print(f'[run_utils][make_digits_ensemble_data] mode: {mode}, data_path: {data_path}')
 
     if not os.path.exists(data_path):
         raise Exception(f'ERR - data_path: {data_path}')
+
+    src_path = data_path + '/' + mode + '_src.pkl'
+    tgt_path = data_path + '/' + mode + '_tgt.pkl'
+    print(f'[run_utils][make_digits_ensemble_data] src_path: {src_path},\ntgt_path: {tgt_path}')
+
+    all_src_data: List[KT_TTS] = []
+    with open(src_path, mode='rb') as s_f:
+        all_src_data = pickle.load(s_f)
+        print(f'[run_utils][make_digits_ensemble_data] all_src_data.size: {len(all_src_data)}')
+        print(f'{all_src_data[:10]}')
+
+    all_tgt_data: List[KT_TTS] = []
+    with open(tgt_path, mode='rb') as t_f:
+        all_tgt_data = pickle.load(t_f)
+        print(f'[run_utils][make_digits_ensemble_data] all_tgt_data.size: {len(all_tgt_data)}')
+        print(f'{all_tgt_data[:10]}')
+
+    assert len(all_src_data) == len(all_tgt_data), f'ERR - src_data.size != tgt_data.size'
+
+    # Tokenization
+    ret_dict = {
+        'input_ids': [],
+        'attention_mask': [],
+        'token_type_ids': [],
+        'labels': []
+    }
+
+    for r_idx, (src_data, tgt_data) in enumerate(zip(all_src_data, all_tgt_data)):
+        src_data.sent = src_data.sent.strip()
+        tgt_data.sent = tgt_data.sent.strip()
+
+        src_data.sent = re.sub(r'[^0-9a-zA-Z가-힣\s]', '', src_data.sent)
+        if re.search(r'[^가-힣0-9\s]+', src_data.sent):
+            continue
+
+        if 0 == (r_idx % 1000):
+            print(f'[run_utils][make_digits_ensemble_data] {r_idx} is processing... {src_data.sent}')
+
+        src_tokens = tokenizer(src_data.sent, padding='max_length', max_length=max_seq_len,
+                               return_tensors='np', truncation=True)
+
+        if tgt_data.id in ERR_SENT_ID_FIXED.keys():
+            print(f'[run_utils][make_digits_ensemble_data] ERR DETECTED -> {tgt_data.id}, {tgt_data.sent}')
+            print(f'[run_utils][make_digits_ensemble_data] {ERR_SENT_ID_FIXED[tgt_data.id]}')
+            tgt_data.sent = tgt_data.sent.replace(ERR_SENT_ID_FIXED[tgt_data.id][0],
+                                                  ERR_SENT_ID_FIXED[tgt_data.id][1])
+            print(f'[run_utils][make_digits_ensemble_data] ERR FIXED -> {tgt_data.sent}')
+
+        if src_data.id in ERR_SENT_CHANGED_FIXED.keys():
+            print(f'[run_utils][make_digits_ensemble_data] ERR Sent\ninput:\n{src_data.sent}\nans:\n{tgt_data.sent}')
+            print(f'[run_utils][make_digits_ensemble_data] \n{ERR_SENT_CHANGED_FIXED[src_data.id][0]} ->'
+                  f'\n{ERR_SENT_CHANGED_FIXED[src_data.id][1]}')
+            src_data.sent = ERR_SENT_CHANGED_FIXED[src_data.id][0]
+            tgt_data.sent = ERR_SENT_CHANGED_FIXED[src_data.id][1]
+
+        tgt_tokens = [decode_vocab['[CLS]']] + [decode_vocab[x] for x in list(tgt_data.sent)] + [decode_vocab['[SEP]']]
+        if max_seq_len <= len(tgt_tokens):
+            tgt_tokens = tgt_tokens[:max_seq_len-1]
+            tgt_tokens.append(decode_vocab['[SEP]'])
+        else:
+            diff_size = max_seq_len - len(tgt_tokens)
+            tgt_tokens += [decode_vocab['[PAD]']] * diff_size
+        assert max_seq_len == len(tgt_tokens), f'ERR - tgt_tokens.size: {len(tgt_tokens)}'
+
+        ret_dict['input_ids'].append(src_tokens['input_ids'][0])
+        ret_dict['attention_mask'].append(src_tokens['attention_mask'][0])
+        ret_dict['token_type_ids'].append(src_tokens['token_type_ids'][0])
+        ret_dict['labels'].append(tgt_tokens)
+    # end loop
+
+    # convert list to np
+    for key, val in ret_dict.items():
+        ret_dict[key] = torch.LongTensor(np.array(val))
+        print(f'[run_utils][make_digits_ensemble_data] {mode}.{key}.size: {ret_dict[key].size()}')
+
+    return ret_dict
+
