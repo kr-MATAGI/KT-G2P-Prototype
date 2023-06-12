@@ -12,7 +12,7 @@ from typing import Dict, List
 
 from kocharelectra_tokenization import KoCharElectraTokenizer
 from definition.data_def import KT_TTS
-from utils.error_fixer import ERR_SENT_ID_FIXED
+from utils.error_fixer import ERR_SENT_ID_FIXED, ERR_SENT_CHANGED_FIXED
 
 import platform
 if 'Windows' == platform.system():
@@ -104,6 +104,13 @@ class NartNpyMaker:
         for r_idx, (src_data, tgt_data) in enumerate(zip(src_data_list, tgt_data_list)):
             src_data.sent = src_data.sent.strip()
             tgt_data.sent = tgt_data.sent.strip()
+
+            if src_data.id in ERR_SENT_CHANGED_FIXED.keys():
+                print(f'[NartNpyMaker][_tokenization] ERR Sent\ninput:\n{src_data.sent}\nans:\n{tgt_data.sent}')
+                print(f'[NartNpyMaker][_tokenization] \n{ERR_SENT_CHANGED_FIXED[src_data.id][0]} ->'
+                      f'\n{ERR_SENT_CHANGED_FIXED[src_data.id][1]}')
+                src_data.sent = ERR_SENT_CHANGED_FIXED[src_data.id][0]
+                tgt_data.sent = ERR_SENT_CHANGED_FIXED[src_data.id][1]
 
             if not re.match(r"[가-힣]+", src_data.sent):
                 except_output_pron_list.append((src_data.id, src_data.sent, tgt_data.sent))

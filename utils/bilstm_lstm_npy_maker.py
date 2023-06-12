@@ -12,7 +12,7 @@ from typing import Dict, List
 
 from kocharelectra_tokenization import KoCharElectraTokenizer
 from definition.data_def import KT_TTS
-from utils.error_fixer import ERR_SENT_ID_FIXED
+from utils.error_fixer import ERR_SENT_ID_FIXED, ERR_SENT_CHANGED_FIXED
 
 import platform
 if "Windows" == platform.system():
@@ -104,6 +104,13 @@ class LstmEncDecNpyMaker:
         for root_idx, (raw_data, g2p_data) in enumerate(zip(raw_data_list, g2p_data_list)):
             raw_data.sent = raw_data.sent.strip()
             g2p_data.sent = g2p_data.sent.strip()
+
+            if raw_data.id in ERR_SENT_CHANGED_FIXED.keys():
+                print(f'[LstmEncDecNpyMaker][_tokenization] {raw_data.id} ERR Sent\ninput:\n{raw_data.sent}\nans:\n{g2p_data.sent}')
+                print(f'[LstmEncDecNpyMaker][_tokenization] \n{ERR_SENT_CHANGED_FIXED[raw_data.id][0]} ->'
+                      f'\n{ERR_SENT_CHANGED_FIXED[raw_data.id][1]}')
+                raw_data.sent = ERR_SENT_CHANGED_FIXED[raw_data.id][0]
+                g2p_data.sent = ERR_SENT_CHANGED_FIXED[g2p_data.id][1]
 
             if not re.match(r"[가-힣]+", raw_data.sent):
                 except_output_pron_list.append((raw_data.id, raw_data.sent, g2p_data.sent))
