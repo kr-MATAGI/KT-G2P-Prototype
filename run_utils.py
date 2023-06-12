@@ -1,3 +1,5 @@
+import os
+
 import torch
 from torch.utils.data import Dataset
 
@@ -123,3 +125,10 @@ def make_eojeol_mecab_res(input_sent: str, mecab_res: List):
 
     return total_eojeol_morp
 
+#==================================================
+def make_digits_ensemble_data(data_path: str, mode: str):
+#==================================================
+    print(f'[run_utils][make_digits_ensemble_data] mode: {mode}, data_path: {data_path}')
+
+    if not os.path.exists(data_path):
+        raise Exception(f'ERR - data_path: {data_path}')
