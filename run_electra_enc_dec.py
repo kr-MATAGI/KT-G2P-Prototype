@@ -31,7 +31,7 @@ if "Windows" == platform.system():
     from eunjeon import Mecab # Windows
 else:
     from konlpy.tag import Mecab # Linux
-from definition.data_def import OurSamDebug
+from definition.data_def import OurSamDebug, DictWordItem
 
 ### GLOBAL
 logger = init_logger()
@@ -112,11 +112,9 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
             input_sent = input_sent.replace("[CLS]", "").replace("[SEP]", "").replace("[PAD]", "").strip()
 
             pred_sent = "".join([output_ids2tok[x] for x in pred.tolist()])
-            # candi_str = tokenizer.decode(pred.tolist())
             pred_sent = pred_sent.replace("[CLS]", "").replace("[SEP]", "").replace("[PAD]", "").strip()
 
             ans_sent = "".join([output_ids2tok[x] for x in lab.tolist()])
-            # ref_str = tokenizer.decode(lab.tolist())
             ans_sent = ans_sent.replace("[CLS]", "").replace("[SEP]", "").replace("[PAD]", "").strip()
 
             ''' 우리말 샘 문자열-발음열 대치 '''
@@ -453,4 +451,4 @@ if "__main__" == __name__:
     main(config_path="config/electra_bilstm_lstm.json",
          decoder_vocab_path="./data/vocab/pron_eumjeol_vocab.json",
          jaso_post_proc_path="./data/post_method/jaso_filter.json",
-         our_sam_path="./data/dictionary/our_sam_std_dict.pkl")
+         our_sam_path="./data/dictionary/filtered_dict_word_item.pkl")

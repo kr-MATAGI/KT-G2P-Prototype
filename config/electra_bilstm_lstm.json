@@ -26,6 +26,6 @@
   "learning_rate": 5e-5,
   "device": "cuda",
   "use_custom_vocab": true,
-  "do_post_method": true,
-  "use_our_sam": false
+  "do_post_method": false,
+  "use_our_sam": true
 }
