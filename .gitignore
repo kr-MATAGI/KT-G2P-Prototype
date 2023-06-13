@@ -3,6 +3,7 @@
 *.pkl
 *.zip
 *.xml
+*.json
 
 # IDE
 .DS_Stroe

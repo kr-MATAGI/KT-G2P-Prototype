@@ -1,13 +1,16 @@
 import json
 import os
 import pickle
+import copy
 import re
 
-from definition.data_def import KrStdDict, OurSamDict, ConjuInfo, WordInfo
+from definition.data_def import KrStdDict, OurSamDict, ConjuInfo, WordInfo, DictWordItem
 
 import xml.etree.ElementTree as ET
 from typing import List, Dict
+from collections import deque
 
+''' XML 버전 '''
 #===================================
 class OurSamMaker:
 #===================================
@@ -328,39 +331,183 @@ class OurSamMerger:
 
         return ret_merged_dict
 
+''' JSON 버전 '''
+#======================================================
+class OurSamMakerByJson:
+#======================================================
+    def __init__(self):
+        print(f'[OurSamMakerByJson][__init__] __init__ !')
+        self.TARGET_INFO = {
+            'word_type': ['고유어', '한자어', '외래어'],
+            'pos': ['명사'],
+            'sense_no': ['001'],
+            'sense_type': ['일반어'],
+            'origin_lang_type': ['영어', '고유어', '한자어']
+        }
+        print(f'[OurSamMakerByJson][__init__] Target_info:\n{self.TARGET_INFO}')
+
+    def make_dict_word_item_list(
+            self,
+            raw_json_dir_path: str
+    ) -> List[DictWordItem]:
+        print(f'[OurSamMakerByJson][make_dict_word_item_list] raw_json_dir_path: {raw_json_dir_path}')
+        if not os.path.exists(raw_json_dir_path):
+            raise Exception(f'ERR - raw_json_dir_path: {raw_json_dir_path}')
+
+        raw_json_files = [x for x in os.listdir(raw_json_dir_path) if '.json' in x]
+        print(f'[OurSamMakerByJson][make_dict_word_item_list] raw_json_files.size: {len(raw_json_files)}')
+
+        raw_word_item_list: List[DictWordItem] = []
+        for f_idx, file_name in enumerate(raw_json_files):
+            print(f'[OurSamMakerByJson][make_dict_word_item_list] f_idx: {f_idx}, file_name: {file_name}')
+            root_data = None
+            with open(raw_json_dir_path + '/' + file_name, mode='r') as f:
+                root_data = json.load(f)
+
+            item_arr = root_data['channel']['item']
+            print(f'[OurSamMakerByJson][make_dict_word_item_list] item_arr.size: {len(item_arr)}')
+
+            for item_idx, item_obj in enumerate(item_arr):
+                dic_word_item = DictWordItem(
+                    word=item_obj['wordinfo']['word'],
+                    word_type=item_obj['wordinfo']['word_type'],
+                    word_unit=item_obj['wordinfo']['word_unit']
+                )
+
+                if 'pronunciation_info' in item_obj['wordinfo'].keys():
+                    for p_info in item_obj['wordinfo']['pronunciation_info']:
+                        dic_word_item.pronun_list.append(p_info['pronunciation'])
+                else:
+                    dic_word_item.pronun_list = dic_word_item.word
+
+                if 'original_language_info' in item_obj['wordinfo'].keys():
+                    dic_word_item.origin_lang = item_obj['wordinfo']['original_language_info'][0]['original_language']
+                    dic_word_item.origin_lang_type = item_obj['wordinfo']['original_language_info'][0]['language_type']
+
+                if 'senseinfo' in item_obj.keys():
+                    dic_word_item.sense_no = item_obj['senseinfo']['sense_no']
+                    if 'pos' in item_obj['senseinfo'].keys():
+                        dic_word_item.pos = item_obj['senseinfo']['pos']
+
+                    if 'type' in item_obj['senseinfo'].keys():
+                        dic_word_item.sense_type = item_obj['senseinfo']['type']
+
+                raw_word_item_list.append(copy.deepcopy(dic_word_item))
+            # end loop, item
+        # end loop, file
+        print(f'[OurSamMakerByJson][make_dict_word_item_list] raw_word_item_list.size: {len(raw_word_item_list)}')
+
+        return raw_word_item_list
+
+    def get_filtered_word_item(
+            self,
+            dict_word_item_list: List[DictWordItem]
+    ):
+        print(f'[OurSamMakerByJson][get_filtered_word_item] dict_word_item_list.size: {len(dict_word_item_list)}')
+
+        deq_word_item_list = deque(dict_word_item_list)
+        deque_size = len(deq_word_item_list)
+        for _ in range(deque_size):
+            curr_item = deq_word_item_list.popleft()
+
+            ''' 혼종어를 제외한 갯수 ''' # 개별로 했을 때 1,164,952 -> 897,693
+            if curr_item.word_type not in self.TARGET_INFO['word_type']:
+                continue
+
+            ''' 명사만을 추출 ''' # 개별로 했을 때 1,164,952 -> 563,694
+            if curr_item.pos not in self.TARGET_INFO['pos']:
+                continue
+            # 혼종어 제외, 명사만 추출 개수: 1,164,952 -> 500,296
+
+            ''' sense id == 001 ''' # 위에꺼까지 종합: 1,164,952 -> 360,705
+            if (curr_item.sense_no not in self.TARGET_INFO['sense_no']) and ('' != curr_item.sense_no):
+                continue
+
+            ''' 일반어 ''' # 1,164,952 -> 268,343
+            if curr_item.sense_type not in self.TARGET_INFO['sense_type']:
+                continue
+
+            deq_word_item_list.append(curr_item)
+        print(f'[OurSamMakerByJson][get_filtered_word_item] deq_word_item_list.size: {len(deq_word_item_list)}')
+
+        ''' word나 pron_list에서 특수 기호 제거 '''
+        for word_item in deq_word_item_list:
+            word_item.word = word_item.word.replace('^', ' ').replace('-', '')
+            if not isinstance(word_item.pronun_list, list):
+                # str -> list
+                word_item.pronun_list = [word_item.pronun_list.replace('^', ' ').replace('-', '')]
+            else:
+                for p_idx, proun_item in enumerate(word_item.pronun_list):
+                    word_item.pronun_list[p_idx] = re.sub(r'[^가-힣]+', '', proun_item)
+
+        return deq_word_item_list
+
+
 ### MAIN ###
 if "__main__" == __name__:
     print("[dict_maker] __main__")
 
-    is_make_our_sam_dict = False
-    is_merge_kor_eng = True
+    b_use_xml_version_maker = False
+    b_use_json_version_maker = True
 
-    if is_make_our_sam_dict:
-        our_sam_maker = OurSamMaker()
-        # all_sam_data = our_sam_maker.parse_xml_files(dir_path="../data/our_sam/xml",
-        #                                              save_path="../data/our_sam/pkl/our_sam_data.pkl")
-        our_sam_dict = our_sam_maker.make_our_sam_dict(pkl_path="../data/our_sam/pkl/our_sam_data.pkl")
+    if b_use_xml_version_maker:
+        is_make_our_sam_dict = False
+        is_merge_kor_eng = True
 
-        # Save
-        dict_save_path = "../data/our_sam_filter_dict.json"
-        with open(dict_save_path, mode="w", encoding="utf-8") as f:
-            json.dump(our_sam_dict, f, ensure_ascii=False, indent=4)
+        if is_make_our_sam_dict:
+            our_sam_maker = OurSamMaker()
+            # all_sam_data = our_sam_maker.parse_xml_files(dir_path="../data/our_sam/xml",
+            #                                              save_path="../data/our_sam/pkl/our_sam_data.pkl")
+            our_sam_dict = our_sam_maker.make_our_sam_dict(pkl_path="../data/our_sam/pkl/our_sam_data.pkl")
 
-    if is_merge_kor_eng:
-        our_sam_merger = OurSamMerger()
-        merged_our_sam_dict = our_sam_merger.merge_kor_eng_dict(
-            kor_path='../data/dictionary/our_sam_std_dict.pkl',
-            eng_path='../data/dictionary/dictionary.pkl'
-        )
+            # Save
+            dict_save_path = "../data/our_sam_filter_dict.json"
+            with open(dict_save_path, mode="w", encoding="utf-8") as f:
+                json.dump(our_sam_dict, f, ensure_ascii=False, indent=4)
 
-        # save merge_dict
-        save_path = '../data/dictionary/merged_kor_eng_info.pkl'
-        with open(save_path, mode="wb") as merge_f:
-            pickle.dump(merged_our_sam_dict, merge_f)
-            print(f'[our_sam_maker][__main__] Complete svae - {save_path}')
-            print(f'[our_sam_maker][__main__] merged_dict.size: {len(merged_our_sam_dict)}')
+        if is_merge_kor_eng:
+            our_sam_merger = OurSamMerger()
+            merged_our_sam_dict = our_sam_merger.merge_kor_eng_dict(
+                kor_path='../data/dictionary/our_sam_std_dict.pkl',
+                eng_path='../data/dictionary/dictionary.pkl'
+            )
 
-        # to txt file
-        with open('../data/dictionary/merged_kor_eng_info.txt', mode='w', encoding='utf-8') as f:
-            for key, val in merged_our_sam_dict.items():
-                f.write(key + ':' + val[0] + '\n')
+            # save merge_dict
+            save_path = '../data/dictionary/merged_kor_eng_info.pkl'
+            with open(save_path, mode="wb") as merge_f:
+                pickle.dump(merged_our_sam_dict, merge_f)
+                print(f'[our_sam_maker][__main__] Complete svae - {save_path}')
+                print(f'[our_sam_maker][__main__] merged_dict.size: {len(merged_our_sam_dict)}')
+
+            # to txt file
+            with open('../data/dictionary/merged_kor_eng_info.txt', mode='w', encoding='utf-8') as f:
+                for key, val in merged_our_sam_dict.items():
+                    f.write(key + ':' + val[0] + '\n')
+
+    if b_use_json_version_maker:
+        print(f'[our_sam_maker][__main__] maker - json_version')
+        dict_maker_json_ver = OurSamMakerByJson()
+
+        raw_word_item_pkl_path = '../data/dictionary/raw_dict_word_item.pkl'
+        filtered_word_item_pkl_path = '../data/dictionary/filtered_dict_word_item.pkl'
+        b_make_raw_word_item_list = False
+
+        if b_make_raw_word_item_list:
+            word_item_list = dict_maker_json_ver.make_dict_word_item_list(raw_json_dir_path='../data/our_sam')
+            print(f'[our_sam_maker][__main__] word_item_list.size: {len(word_item_list)}')
+
+            ''' Save '''
+            with open(raw_word_item_pkl_path, mode='wb') as f:
+                pickle.dump(word_item_list, f)
+
+        raw_word_item_list = []
+        with open(raw_word_item_pkl_path, mode='rb') as f:
+            raw_word_item_list = pickle.load(f)
+        print(f'[our_sam_maker][__main__] raw_word_item_list.size: {len(raw_word_item_list)}')
+
+        dict_word_item_list = dict_maker_json_ver.get_filtered_word_item(dict_word_item_list=raw_word_item_list)
+        print(f'[our_sam_maker][__main__] dict_word_item_list.size: {len(dict_word_item_list)}')
+
+        ''' Save '''
+        with open(filtered_word_item_pkl_path, mode='wb') as f:
+            pickle.dump(dict_word_item_list, f)

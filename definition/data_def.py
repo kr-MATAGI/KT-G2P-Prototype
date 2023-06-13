@@ -11,6 +11,18 @@ class WordInfo:
     source: str
 
 @dataclass
+class DictWordItem:
+    word: str = ''
+    word_type: str = ''
+    word_unit: str = ''
+    pronun_list: List[str] = field(default_factory=list)  # pronunciation_info -> pronunciation
+    sense_no: str = ''  # senseinfo -> sense_no
+    sense_type: str = ''  # senseinfo -> type
+    pos: str = ''  # senseinfo -> pos
+    origin_lang: str = ''  # original_language_info -> original_language
+    origin_lang_type: str = ''  # original_language_info -> language_type
+
+@dataclass
 class KT_TTS:
     id: str = '000000'
     sent: str = ""
