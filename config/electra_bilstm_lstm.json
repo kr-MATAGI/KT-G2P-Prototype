@@ -20,7 +20,7 @@
   "output_dir": "electra-bilstm-lstm-susa-kor",
   "seed": 42,
   "train_batch_size": 64,
-  "eval_batch_size": 1,
+  "eval_batch_size": 128,
   "logging_steps": 1019,
   "save_steps": 1019,
   "learning_rate": 5e-5,

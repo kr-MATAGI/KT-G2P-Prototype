@@ -14,7 +14,8 @@ from transformers import ElectraConfig, get_linear_schedule_with_warmup
 from model.electra_std_pron_rule import ElectraStdPronRules
 from definition.data_def import DictWordItem
 from utils.post_method import (
-    apply_our_sam_word_item, make_g2p_word_dictionary
+    apply_our_sam_word_item, make_g2p_word_dictionary,
+    save_debug_txt
 )
 
 import time
@@ -119,8 +120,8 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
             ''' 우리말 샘 문자열-발음열 대치 '''
             ''' debug '''
             if args.use_our_sam:
-                apply_our_sam_word_item(our_sam_g2p_dict=our_sam_dict, mecab=mecab,
-                                        input_sent=input_sent, pred_sent=pred_sent, ans_sent=ans_sent)
+                applied_res, is_change = apply_our_sam_word_item(our_sam_g2p_dict=our_sam_dict, mecab=mecab,
+                                                                 input_sent=input_sent, pred_sent=pred_sent, ans_sent=ans_sent)
 
             # print(f"{p_idx}:\nraw: \n{input_sent}\ncandi: \n{pred_sent}\nref: \n{ans_sent}")
 
@@ -155,31 +156,6 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
             w_f.write(w_candi_s+'\n')
             w_f.write(w_ref_s+'\n')
             w_f.write('==================\n\n')
-
-    ''' 우리말 샘 변경 사항 파일로 저장'''
-    save_debug_txt("./results/bilstm_lstm/our_sam_debug.txt", our_sam_debug_list)
-    save_debug_txt("./results/bilstm_lstm/fixed_our_sam_debug.txt", fixed_our_sam_list)
-    save_debug_txt("./results/bilstm_lstm/wrong_our_sam_debug.txt", wrong_our_sam_list)
-
-#============================================================
-def save_debug_txt(save_path: str, our_sam_debug_list: List[OurSamDebug]):
-#============================================================
-    print(f"[run_g2p][save_debug_txt] save_path: {save_path}")
-
-    with open(save_path, mode="w", encoding="utf-8") as w_f:
-        for d_idx, debug_item in enumerate(our_sam_debug_list):
-            w_f.write(f"{str(d_idx)}\n\n")
-            w_f.write(f"입력 문장:\n{debug_item.input_sent}\n\n")
-            w_f.write(f"예측 문장:\n{debug_item.pred_sent}\n\n")
-            w_f.write(f"정답 문장:\n{debug_item.ans_sent}\n\n")
-            w_f.write(f"변경된 문장:\n{debug_item.conv_sent}\n\n")
-
-            w_f.write("=========================\n")
-            w_f.write(f"입력  예측  변경  정답\n")
-            for inp, pred, conv, ans in zip(debug_item.input_word, debug_item.pred_word,
-                                            debug_item.our_sam_word, debug_item.ans_word):
-                w_f.write(f"{inp}\t{pred}\t{conv}\t{ans}\n")
-            w_f.write("=========================\n\n")
 
 #========================================
 def train(args, model, tokenizer, train_dataset, dev_dataset,

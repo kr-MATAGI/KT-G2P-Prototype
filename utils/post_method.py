@@ -64,7 +64,7 @@ def apply_our_sam_word_item(
                     - key-value 에서 value는 발음열들의 목록
                     - 이 안에 없다면 현재 예측된 발음열을 교체
             '''
-            split_pred_sent[inp_idx] = our_sam_g2p_dict[inp_item]
+            split_pred_sent[inp_idx] = our_sam_g2p_dict[inp_item][0]
             is_change = True
 
             # For Debug
@@ -106,6 +106,26 @@ def make_eojeol_mecab_res(input_sent: str, mecab_res: List):
         total_eojeol_morp.append(copy.deepcopy(eojeol_set))
 
     return total_eojeol_morp
+
+#========================================================
+def save_debug_txt(save_path: str, our_sam_debug_list: List[OurSamDebug]):
+#========================================================
+    print(f"[run_g2p][save_debug_txt] save_path: {save_path}")
+
+    with open(save_path, mode="w", encoding="utf-8") as w_f:
+        for d_idx, debug_item in enumerate(our_sam_debug_list):
+            w_f.write(f"{str(d_idx)}\n\n")
+            w_f.write(f"입력 문장:\n{debug_item.input_sent}\n\n")
+            w_f.write(f"예측 문장:\n{debug_item.pred_sent}\n\n")
+            w_f.write(f"정답 문장:\n{debug_item.ans_sent}\n\n")
+            w_f.write(f"변경된 문장:\n{debug_item.conv_sent}\n\n")
+
+            w_f.write("=========================\n")
+            w_f.write(f"입력  예측  변경  정답\n")
+            for inp, pred, conv, ans in zip(debug_item.input_word, debug_item.pred_word,
+                                            debug_item.our_sam_word, debug_item.ans_word):
+                w_f.write(f"{inp}\t{pred}\t{conv}\t{ans}\n")
+            w_f.write("=========================\n\n")
 
 ### MAIN ###
 if '__main__' == __name__:
