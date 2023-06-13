@@ -12,6 +12,10 @@ from torch.utils.data import RandomSampler, SequentialSampler, DataLoader
 from utils.kocharelectra_tokenization import KoCharElectraTokenizer
 from transformers import ElectraConfig, get_linear_schedule_with_warmup
 from model.electra_std_pron_rule import ElectraStdPronRules
+from definition.data_def import DictWordItem
+from utils.post_method import (
+    apply_our_sam_word_item, make_g2p_word_dictionary
+)
 
 import time
 from attrdict import AttrDict
@@ -25,24 +29,25 @@ from run_utils import (
     make_eojeol_mecab_res
 )
 
-### OurSam Dict
 import platform
 if "Windows" == platform.system():
     from eunjeon import Mecab # Windows
 else:
     from konlpy.tag import Mecab # Linux
-from definition.data_def import OurSamDebug, DictWordItem
+
 
 ### GLOBAL
 logger = init_logger()
 
+
 #========================================
 def evaluate(args, model, tokenizer, eval_dataset, mode,
-             output_vocab: Dict[str, int], our_sam_dict: Dict[str, str], global_steps: str):
+             output_vocab: Dict[str, int], our_sam_dict: Dict[str, List[str]], global_steps: str):
 #========================================
     # init
     eval_sampler = SequentialSampler(eval_dataset)
     eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
+    mecab = Mecab()
 
     output_ids2tok = {v: k for k, v in output_vocab.items()}
 
@@ -100,71 +105,22 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
     # end loop
     eval_end_time = time.time()
 
-    ''' 우리말샘 말뭉치-발음열 변경 Debug '''
-    mecab = Mecab()
-    change_count = 0
-    our_sam_debug_list: List[OurSamDebug] = []
-    fixed_our_sam_list: List[OurSamDebug] = []
-    wrong_our_sam_list: List[OurSamDebug] = []
+    ''' Do Apply Post Method '''
     for (input_item, pred_item, ans_item) in zip(inputs_list, pred_list, ans_list):
         for p_idx, (input_i, pred, lab) in enumerate(zip(input_item, pred_item, ans_item)):
             input_sent = tokenizer.decode(input_i)
-            input_sent = input_sent.replace("[CLS]", "").replace("[SEP]", "").replace("[PAD]", "").strip()
-
             pred_sent = "".join([output_ids2tok[x] for x in pred.tolist()])
-            pred_sent = pred_sent.replace("[CLS]", "").replace("[SEP]", "").replace("[PAD]", "").strip()
-
             ans_sent = "".join([output_ids2tok[x] for x in lab.tolist()])
-            ans_sent = ans_sent.replace("[CLS]", "").replace("[SEP]", "").replace("[PAD]", "").strip()
+
+            input_sent = re.sub(r'\[CLS\]|\[SEP\]|\[PAD\]', '', input_sent)
+            pred_sent = re.sub(r'\[CLS\]|\[SEP\]|\[PAD\]', '', pred_sent)
+            ans_sent = re.sub(r'\[CLS\]|\[SEP\]|\[PAD\]', '', ans_sent)
 
             ''' 우리말 샘 문자열-발음열 대치 '''
             ''' debug '''
             if args.use_our_sam:
-                our_sam_debug = OurSamDebug(
-                    input_sent=input_sent, pred_sent=pred_sent, ans_sent=ans_sent
-                )
-
-                mecab_res = mecab.pos(input_sent)
-                mecab_res = make_eojeol_mecab_res(input_sent, mecab_res)
-                pos_list = []
-                for res_item in mecab_res:
-                    eojeol_pos = []
-                    for morp_item in res_item:
-                        eojeol_pos.extend(morp_item[-1])
-                    pos_list.append(eojeol_pos)
-                mecab_res = pos_list
-                # [[('저', ['NP']), ('를', ['JKO'])], [('부르', ['VV']), ('셨', ['EP', 'EP']), ('나요', ['EC'])]]
-                # [['NP', 'JKO'], ['VV', 'EP', 'EP', 'EC']]
-
-                cp_pred_sent = copy.deepcopy(pred_sent.split(" "))
-                split_ans_sent = ans_sent.split(" ")
-                for rs_idx, raw_sp_item in enumerate(input_sent.split(" ")):
-                    include_flag = True
-                    for tag in mecab_res[rs_idx]:
-                        if tag not in ["NNG", "NNP"]: # 1: NNP, 2: NNG
-                            include_flag = False
-                            break
-                    if not include_flag:
-                        continue
-                    if raw_sp_item in our_sam_dict.keys():
-                        our_sam_debug.input_word.append(raw_sp_item)
-                        our_sam_debug.pred_word.append(cp_pred_sent[rs_idx])
-                        our_sam_debug.our_sam_word.append(our_sam_dict[raw_sp_item])
-                        our_sam_debug.ans_word.append(split_ans_sent[rs_idx])
-
-                        change_count += 1
-                        cp_pred_sent[rs_idx] = our_sam_dict[raw_sp_item]
-
-                origin_pred_sent = copy.deepcopy(pred_sent)
-                pred_sent = " ".join(cp_pred_sent).strip()
-                our_sam_debug.conv_sent = pred_sent
-                if 0 < len(our_sam_debug.input_word):
-                    our_sam_debug_list.append(our_sam_debug)
-
-                    if origin_pred_sent != pred_sent and pred_sent == ans_sent:
-                        fixed_our_sam_list.append(our_sam_debug)
-                    elif origin_pred_sent != pred_sent and pred_sent != ans_sent:
-                        wrong_our_sam_list.append(our_sam_debug)
+                apply_our_sam_word_item(our_sam_g2p_dict=our_sam_dict, mecab=mecab,
+                                        input_sent=input_sent, pred_sent=pred_sent, ans_sent=ans_sent)
 
             # print(f"{p_idx}:\nraw: \n{input_sent}\ncandi: \n{pred_sent}\nref: \n{ans_sent}")
 
@@ -186,7 +142,7 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
           f"total.size: {len(eval_dataset)}")
     print(f"[run_electra_enc_dec][evaluate] Elapsed time: {eval_end_time - eval_start_time} seconds")
     print(f'[run_electra_enc_dec][evaluate] GPU Time: {sum(cuda_times)} seconds')
-    print(f"[run_electra_enc_dec][evaluate] our_sam change count: {change_count}")
+    # print(f"[run_electra_enc_dec][evaluate] our_sam change count: {change_count}")
 
     eval_pbar.close()
 
@@ -369,9 +325,10 @@ def main(config_path: str,
         post_proc_dict = json.load(f)
 
     ''' 우리말 샘 문자열-발음열 사전 '''
-    our_sam_dict: None
+    our_sam_dict: List[DictWordItem] = None
     with open(our_sam_path, mode="rb") as f:
         our_sam_dict = pickle.load(f)
+        our_sam_dict = make_g2p_word_dictionary(our_sam_word_items=our_sam_dict)
     print(f"[run_g2p][main] our_sam_dict.size: {len(our_sam_dict)}")
 
     # Load model
