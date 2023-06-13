@@ -510,4 +510,4 @@ if "__main__" == __name__:
 
         ''' Save '''
         with open(filtered_word_item_pkl_path, mode='wb') as f:
-            pickle.dump(dict_word_item_list, f)
+            pickle.dump(list(dict_word_item_list), f)
