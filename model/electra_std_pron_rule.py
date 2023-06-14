@@ -174,7 +174,7 @@ class ElectraStdPronRules(ElectraPreTrainedModel):
             origin_char = origin_sent[b_idx][time_step]
             
             # TEST
-            # origin_char = '석'
+            origin_char = '핌'
             
             if origin_char in ["[CLS]", "[SEP]", "[PAD]", "[UNK]", "[MASK]"]:
                 ret_mutable_pron.append([self.out_tag2ids[origin_char]])
@@ -196,7 +196,6 @@ class ElectraStdPronRules(ElectraPreTrainedModel):
             if 3 == len(origin_jaso):
                 candi_final = copy.deepcopy(self.jaso_pair_dict["final"][origin_jaso[2]])
                 if " " in candi_final:
-                    candi_final.remove(" ")
                     empty_handle_list = list(itertools.product(candi_initial, candi_vowel))
                     empty_handle_list = [join_jamos("".join(x)) for x in empty_handle_list]
                     empty_handle_list = [self.out_tag2ids[x] for x in empty_handle_list]
@@ -206,7 +205,9 @@ class ElectraStdPronRules(ElectraPreTrainedModel):
                 candi_combination = list(itertools.product(candi_initial, candi_vowel))
             else:
                 candi_combination = list(itertools.product(candi_initial, candi_vowel, candi_final))
-            candi_combination = [join_jamos("".join(x)) for x in candi_combination]
+            candi_combination = [join_jamos("".join(x).strip()) for x in candi_combination]
+            print(candi_combination)
+            input()
             candi_combination = [self.out_tag2ids[x] for x in candi_combination]
             all_combination.extend(candi_combination)
 
