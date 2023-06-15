@@ -169,7 +169,9 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
 
     ''' 우리말 사전 적용 결과 저장 '''
     if args.use_our_sam and args.our_sam_debug:
-        save_our_sam_debug('./results/bilstm_lstm/our_sam_debug.txt', all_our_sam_debug_info)
+        save_our_sam_debug(all_item_save_path='./results/bilstm_lstm/our_sam_all.txt',
+                           wrong_item_save_path='./results/bilstm_lstm/our_sam_wrong.txt',
+                           our_sam_debug_list=all_our_sam_debug_info)
         print(f'[run_electra_enc_dec][evaluate] OurSamDebug info Save Complete !')
 
 #========================================
