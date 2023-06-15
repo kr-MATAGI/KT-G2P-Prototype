@@ -12,10 +12,10 @@ from torch.utils.data import RandomSampler, SequentialSampler, DataLoader
 from utils.kocharelectra_tokenization import KoCharElectraTokenizer
 from transformers import ElectraConfig, get_linear_schedule_with_warmup
 from model.electra_std_pron_rule import ElectraStdPronRules
-from definition.data_def import DictWordItem
+from definition.data_def import DictWordItem, OurSamItem
 from utils.post_method import (
     apply_our_sam_word_item, make_g2p_word_dictionary,
-    save_debug_txt
+    save_debug_txt, debug_change_comparing
 )
 
 import time
@@ -64,14 +64,18 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
 
     wrong_case = {
         "input_sent": [],
-        "candi_sent": [],
-        "ref_sent": []
+        "pred_sent": [],
+        "ans_sent": []
     }
 
     # Test Batch가 모두 끝나고 Decoding 되도록
     inputs_list = []
     pred_list = []
     ans_list = []
+
+    # 우리말샘 기분석 사전을 통해 바뀐 문장 갯수
+    all_our_sam_debug_info: List[OurSamItem] = []
+    total_change_cnt = 0
 
     criterion = nn.CrossEntropyLoss()
     eval_pbar = tqdm(eval_dataloader)
@@ -106,7 +110,7 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
     # end loop
     eval_end_time = time.time()
 
-    ''' Do Apply Post Method '''
+    ''' Decode '''
     for (input_item, pred_item, ans_item) in zip(inputs_list, pred_list, ans_list):
         for p_idx, (input_i, pred, lab) in enumerate(zip(input_item, pred_item, ans_item)):
             input_sent = tokenizer.decode(input_i)
@@ -122,8 +126,12 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
             if args.use_our_sam:
                 applied_res, is_change = apply_our_sam_word_item(our_sam_g2p_dict=our_sam_dict, mecab=mecab,
                                                                  input_sent=input_sent, pred_sent=pred_sent, ans_sent=ans_sent)
+                if is_change:
+                    total_change_cnt += 1
+                    all_our_sam_debug_info.append(applied_res)
 
-            # print(f"{p_idx}:\nraw: \n{input_sent}\ncandi: \n{pred_sent}\nref: \n{ans_sent}")
+
+            print(f"{p_idx}:\nraw: \n{input_sent}\ncandi: \n{pred_sent}\nref: \n{ans_sent}")
 
             references.append(ans_sent)
             candidates.append(pred_sent)
@@ -131,8 +139,8 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
                 total_correct += 1
             else:
                 wrong_case["input_sent"].append(input_sent)
-                wrong_case["candi_sent"].append(pred_sent)
-                wrong_case["ref_sent"].append(ans_sent)
+                wrong_case["pred_sent"].append(pred_sent)
+                wrong_case["ans_sent"].append(ans_sent)
 
     wer_score = hug_eval.load("wer").compute(predictions=candidates, references=references)
     per_score = hug_eval.load("cer").compute(predictions=candidates, references=references)
@@ -143,19 +151,25 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
           f"total.size: {len(eval_dataset)}")
     print(f"[run_electra_enc_dec][evaluate] Elapsed time: {eval_end_time - eval_start_time} seconds")
     print(f'[run_electra_enc_dec][evaluate] GPU Time: {sum(cuda_times)} seconds')
-    # print(f"[run_electra_enc_dec][evaluate] our_sam change count: {change_count}")
+    print(f"[run_electra_enc_dec][evaluate] our_sam - \ntotal_change_cnt: {total_change_cnt}")
 
     eval_pbar.close()
 
-    ''' Save Wrong Case'''
+    ''' 최종 결과에서 틀린 문장들 저장 '''
     with open('./results/bilstm_lstm/wrong_case.txt', mode='w', encoding='utf-8') as w_f:
         for w_idx, (w_inp_s, w_candi_s, w_ref_s) in enumerate(zip(wrong_case['input_sent'],
-                                                                  wrong_case['candi_sent'], wrong_case['ref_sent'])):
+                                                                  wrong_case['pred_sent'],
+                                                                  wrong_case['ans_sent'])):
             w_f.write(str(w_idx)+'\n')
             w_f.write(w_inp_s+'\n')
             w_f.write(w_candi_s+'\n')
             w_f.write(w_ref_s+'\n')
             w_f.write('==================\n\n')
+
+    ''' 우리말 사전 적용 결과 저장 '''
+    if args.our_sam_debug:
+        save_debug_txt('./results/bilstm_lstm/our_sam_debug.txt', all_our_sam_debug_info)
+        print(f'[run_electra_enc_dec][evaluate] OurSamDebug info Save Complete !')
 
 #========================================
 def train(args, model, tokenizer, train_dataset, dev_dataset,
