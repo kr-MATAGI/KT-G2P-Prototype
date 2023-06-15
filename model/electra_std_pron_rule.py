@@ -174,7 +174,7 @@ class ElectraStdPronRules(ElectraPreTrainedModel):
             origin_char = origin_sent[b_idx][time_step]
             
             # TEST
-            origin_char = '핌'
+            # origin_char = '핌'
             
             if origin_char in ["[CLS]", "[SEP]", "[PAD]", "[UNK]", "[MASK]"]:
                 ret_mutable_pron.append([self.out_tag2ids[origin_char]])
@@ -206,8 +206,8 @@ class ElectraStdPronRules(ElectraPreTrainedModel):
             else:
                 candi_combination = list(itertools.product(candi_initial, candi_vowel, candi_final))
             candi_combination = [join_jamos("".join(x).strip()) for x in candi_combination]
-            print(candi_combination)
-            input()
+            # print(candi_combination)
+            # input()
             candi_combination = [self.out_tag2ids[x] for x in candi_combination]
             all_combination.extend(candi_combination)
 
