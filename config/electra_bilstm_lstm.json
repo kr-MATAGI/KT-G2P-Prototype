@@ -27,5 +27,6 @@
   "device": "cuda",
   "use_custom_vocab": true,
   "do_post_method": true,
-  "use_our_sam": false
+  "use_our_sam": false,
+  "our_sam_debug": true
 }

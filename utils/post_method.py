@@ -1,8 +1,7 @@
 import copy
 
-from definition.data_def import DictWordItem, OurSamDebug
+from definition.data_def import DictWordItem, OurSamItem
 from typing import List, Dict
-
 
 #========================================================
 def make_g2p_word_dictionary(
@@ -31,7 +30,7 @@ def apply_our_sam_word_item(
     input_sent: str, pred_sent: str, ans_sent: str
 ):
 #========================================================
-    debug_info = OurSamDebug(
+    debug_info = OurSamItem(
         input_sent=input_sent, pred_sent=pred_sent, ans_sent=ans_sent
     )
     is_change = False
@@ -108,9 +107,9 @@ def make_eojeol_mecab_res(input_sent: str, mecab_res: List):
     return total_eojeol_morp
 
 #========================================================
-def save_debug_txt(save_path: str, our_sam_debug_list: List[OurSamDebug]):
+def save_debug_txt(save_path: str, our_sam_debug_list: List[OurSamItem]):
 #========================================================
-    print(f"[run_g2p][save_debug_txt] save_path: {save_path}")
+    print(f"[post_method][save_debug_txt] save_path: {save_path}")
 
     with open(save_path, mode="w", encoding="utf-8") as w_f:
         for d_idx, debug_item in enumerate(our_sam_debug_list):

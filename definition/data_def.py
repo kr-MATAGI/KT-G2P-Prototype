@@ -131,7 +131,7 @@ class OurSamDict:
 
 #==================================================
 @dataclass
-class OurSamDebug:
+class OurSamItem:
 #==================================================
     input_sent: str = ""
     pred_sent: str = ""

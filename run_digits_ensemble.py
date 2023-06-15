@@ -12,7 +12,7 @@ from torch.utils.data import RandomSampler, SequentialSampler, DataLoader
 from utils.kocharelectra_tokenization import KoCharElectraTokenizer
 from transformers import ElectraConfig, get_linear_schedule_with_warmup
 from model.electra_std_pron_rule import ElectraStdPronRules
-from definition.data_def import OurSamDebug
+from definition.data_def import OurSamItem
 
 import time
 from attrdict import AttrDict
@@ -108,9 +108,9 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
     ''' 우리말샘 말뭉치-발음열 변경 Debug '''
     mecab = Mecab()
     change_count = 0
-    our_sam_debug_list: List[OurSamDebug] = []
-    fixed_our_sam_list: List[OurSamDebug] = []
-    wrong_our_sam_list: List[OurSamDebug] = []
+    our_sam_debug_list: List[OurSamItem] = []
+    fixed_our_sam_list: List[OurSamItem] = []
+    wrong_our_sam_list: List[OurSamItem] = []
     for (input_item, pred_item, ans_item) in zip(inputs_list, pred_list, ans_list):
         for p_idx, (input_i, pred, lab) in enumerate(zip(input_item, pred_item, ans_item)):
             input_sent = tokenizer.decode(input_i)
@@ -127,7 +127,7 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
             ''' 우리말 샘 문자열-발음열 대치 '''
             ''' debug '''
             if args.use_our_sam:
-                our_sam_debug = OurSamDebug(
+                our_sam_debug = OurSamItem(
                     input_sent=input_sent, pred_sent=pred_sent, ans_sent=ans_sent
                 )
 
@@ -431,7 +431,7 @@ def main(
                      output_vocab=decode_vocab, our_sam_dict=our_sam_dict, global_steps=global_step)
 
 #============================================================
-def save_debug_txt(save_path: str, our_sam_debug_list: List[OurSamDebug]):
+def save_debug_txt(save_path: str, our_sam_debug_list: List[OurSamItem]):
 #============================================================
     print(f"[run_digits_ensemble][save_debug_txt] save_path: {save_path}")
 
