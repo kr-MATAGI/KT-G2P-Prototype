@@ -107,24 +107,44 @@ def make_eojeol_mecab_res(input_sent: str, mecab_res: List):
     return total_eojeol_morp
 
 #========================================================
-def save_debug_txt(save_path: str, our_sam_debug_list: List[OurSamItem]):
+def save_our_sam_debug(
+        all_item_save_path: str, wrong_item_save_path: str,
+        our_sam_debug_list: List[OurSamItem]
+):
 #========================================================
-    print(f"[post_method][save_debug_txt] save_path: {save_path}")
+    print(f"[post_method][save_debug_txt] all_item_save_path: {all_item_save_path}\n"
+          f"wrong_item_save_path: {wrong_item_save_path}")
 
-    with open(save_path, mode="w", encoding="utf-8") as w_f:
+    with open(all_item_save_path, mode="w", encoding="utf-8") as all_f, \
+            open(wrong_item_save_path, mode='w', encoding='utf-8') as wrong_f:
         for d_idx, debug_item in enumerate(our_sam_debug_list):
-            w_f.write(f"{str(d_idx)}\n\n")
-            w_f.write(f"입력 문장:\n{debug_item.input_sent}\n\n")
-            w_f.write(f"예측 문장:\n{debug_item.pred_sent}\n\n")
-            w_f.write(f"정답 문장:\n{debug_item.ans_sent}\n\n")
-            w_f.write(f"변경된 문장:\n{debug_item.conv_sent}\n\n")
+            all_f.write(f"{str(d_idx)}\n\n")
+            all_f.write(f"입력 문장:\n{debug_item.input_sent}\n\n")
+            all_f.write(f"예측 문장:\n{debug_item.pred_sent}\n\n")
+            all_f.write(f"정답 문장:\n{debug_item.ans_sent}\n\n")
+            all_f.write(f"변경된 문장:\n{debug_item.conv_sent}\n\n")
 
-            w_f.write("=========================\n")
-            w_f.write(f"입력  예측  변경  정답\n")
+            all_f.write("=========================\n")
+            all_f.write(f"입력  예측  변경  정답\n")
             for inp, pred, conv, ans in zip(debug_item.input_word, debug_item.pred_word,
                                             debug_item.our_sam_word, debug_item.ans_word):
-                w_f.write(f"{inp}\t{pred}\t{conv}\t{ans}\n")
-            w_f.write("=========================\n\n")
+                all_f.write(f"{inp}\t{pred}\t{conv}\t{ans}\n")
+            all_f.write("=========================\n\n")
+
+            # Wrong Case
+            if (debug_item.pred_sent != debug_item.conv_sent) and (debug_item.pred_sent != debug_item.ans_sent):
+                wrong_f.write(f"{str(d_idx)}\n\n")
+                wrong_f.write(f"입력 문장:\n{debug_item.input_sent}\n\n")
+                wrong_f.write(f"예측 문장:\n{debug_item.pred_sent}\n\n")
+                wrong_f.write(f"정답 문장:\n{debug_item.ans_sent}\n\n")
+                wrong_f.write(f"변경된 문장:\n{debug_item.conv_sent}\n\n")
+
+                wrong_f.write("=========================\n")
+                wrong_f.write(f"입력  예측  변경  정답\n")
+                for inp, pred, conv, ans in zip(debug_item.input_word, debug_item.pred_word,
+                                                debug_item.our_sam_word, debug_item.ans_word):
+                    wrong_f.write(f"{inp}\t{pred}\t{conv}\t{ans}\n")
+                wrong_f.write("=========================\n\n")
 
 ### MAIN ###
 if '__main__' == __name__:

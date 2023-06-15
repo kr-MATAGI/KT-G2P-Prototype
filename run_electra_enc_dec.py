@@ -15,7 +15,7 @@ from model.electra_std_pron_rule import ElectraStdPronRules
 from definition.data_def import DictWordItem, OurSamItem
 from utils.post_method import (
     apply_our_sam_word_item, make_g2p_word_dictionary,
-    save_debug_txt
+    save_our_sam_debug
 )
 
 import time
@@ -169,7 +169,7 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
 
     ''' 우리말 사전 적용 결과 저장 '''
     if args.use_our_sam and args.our_sam_debug:
-        save_debug_txt('./results/bilstm_lstm/our_sam_debug.txt', all_our_sam_debug_info)
+        save_our_sam_debug('./results/bilstm_lstm/our_sam_debug.txt', all_our_sam_debug_info)
         print(f'[run_electra_enc_dec][evaluate] OurSamDebug info Save Complete !')
 
 #========================================
