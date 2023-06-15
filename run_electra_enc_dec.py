@@ -15,7 +15,7 @@ from model.electra_std_pron_rule import ElectraStdPronRules
 from definition.data_def import DictWordItem, OurSamItem
 from utils.post_method import (
     apply_our_sam_word_item, make_g2p_word_dictionary,
-    save_debug_txt, debug_change_comparing
+    save_debug_txt
 )
 
 import time
