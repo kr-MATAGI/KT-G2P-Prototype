@@ -115,6 +115,7 @@ def save_our_sam_debug(
     print(f"[post_method][save_debug_txt] all_item_save_path: {all_item_save_path}\n"
           f"wrong_item_save_path: {wrong_item_save_path}")
 
+    wrong_case_cnt = 0
     with open(all_item_save_path, mode="w", encoding="utf-8") as all_f, \
             open(wrong_item_save_path, mode='w', encoding='utf-8') as wrong_f:
         for d_idx, debug_item in enumerate(our_sam_debug_list):
@@ -133,6 +134,7 @@ def save_our_sam_debug(
 
             # Wrong Case
             if (debug_item.pred_sent != debug_item.conv_sent) and (debug_item.pred_sent != debug_item.ans_sent):
+                wrong_case_cnt += 1
                 wrong_f.write(f"{str(d_idx)}\n\n")
                 wrong_f.write(f"입력 문장:\n{debug_item.input_sent}\n\n")
                 wrong_f.write(f"예측 문장:\n{debug_item.pred_sent}\n\n")
@@ -145,6 +147,8 @@ def save_our_sam_debug(
                                                 debug_item.our_sam_word, debug_item.ans_word):
                     wrong_f.write(f"{inp}\t{pred}\t{conv}\t{ans}\n")
                 wrong_f.write("=========================\n\n")
+
+    print(f"[post_method][save_debug_txt] wrong_case_cnt: {wrong_case_cnt}")
 
 ### MAIN ###
 if '__main__' == __name__:
