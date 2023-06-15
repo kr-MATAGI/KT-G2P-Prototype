@@ -124,11 +124,12 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
             ''' 우리말 샘 문자열-발음열 대치 '''
             ''' debug '''
             if args.use_our_sam:
-                applied_res, is_change = apply_our_sam_word_item(our_sam_g2p_dict=our_sam_dict, mecab=mecab,
+                our_sam_res, is_change = apply_our_sam_word_item(our_sam_g2p_dict=our_sam_dict, mecab=mecab,
                                                                  input_sent=input_sent, pred_sent=pred_sent, ans_sent=ans_sent)
                 if is_change:
+                    pred_sent = our_sam_res.conv_sent
                     total_change_cnt += 1
-                    all_our_sam_debug_info.append(applied_res)
+                    all_our_sam_debug_info.append(our_sam_res)
 
 
             print(f"{p_idx}:\nraw: \n{input_sent}\ncandi: \n{pred_sent}\nref: \n{ans_sent}")
@@ -167,7 +168,7 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
             w_f.write('==================\n\n')
 
     ''' 우리말 사전 적용 결과 저장 '''
-    if args.our_sam_debug:
+    if args.use_our_sam and args.our_sam_debug:
         save_debug_txt('./results/bilstm_lstm/our_sam_debug.txt', all_our_sam_debug_info)
         print(f'[run_electra_enc_dec][evaluate] OurSamDebug info Save Complete !')
 
