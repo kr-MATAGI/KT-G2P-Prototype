@@ -374,6 +374,19 @@ class OurSamMakerByJson:
                     word_unit=item_obj['wordinfo']['word_unit']
                 )
 
+                if 'conju_info' in item_obj['wordinfo'].keys():
+                    for conju_item in item_obj['wordinfo']['conju_info']:
+                        if ('abbreviation_info' in conju_item.keys()) \
+                                and ('pronunciation_info' in conju_item['abbreviation_info'].keys()):
+                            abbreviation_info_obj = conju_item['abbreviation_info']
+                            dic_word_item.conju_list.append((abbreviation_info_obj['abbreviation'],
+                                                             abbreviation_info_obj['pronunciation_info']['pronunciation']))
+                        if ('conjugation_info' in conju_item.keys()) \
+                                and ('pronunciation_info' in conju_item['conjugation_info'].keys()):
+                            conjugation_info_obj = conju_item['conjugation_info']
+                            dic_word_item.conju_list.append((conjugation_info_obj['conjugation'],
+                                                             conjugation_info_obj['pronunciation_info']['pronunciation']))
+
                 if 'pronunciation_info' in item_obj['wordinfo'].keys():
                     for p_info in item_obj['wordinfo']['pronunciation_info']:
                         dic_word_item.pronun_list.append(p_info['pronunciation'])
@@ -441,7 +454,6 @@ class OurSamMakerByJson:
                     word_item.pronun_list[p_idx] = re.sub(r'[^가-힣]+', '', proun_item)
 
         return deq_word_item_list
-
 
 ### MAIN ###
 if "__main__" == __name__:

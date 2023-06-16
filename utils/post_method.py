@@ -1,23 +1,42 @@
+import re
 import copy
 
 from definition.data_def import DictWordItem, OurSamItem
+from dataclasses import dataclass, field
 from typing import List, Dict
+
+@dataclass
+class PreDictItem:
+    pronun_list: List[str] = field(default_factory=list)
+    pos: str = ''
 
 #========================================================
 def make_g2p_word_dictionary(
     our_sam_word_items: List[DictWordItem]
 ):
 #========================================================
-    ret_dict = {}
+    ret_dict = {} # { 'word': PreDictItem(), ... }
 
     print(f'[post_method][make_g2p_word_dictionary] raw_word_items.size: {len(our_sam_word_items)}')
 
     duplicated_cnt = 0
+    conju_duplicated_cnt = 0
     for wi_idx, word_item in enumerate(our_sam_word_items):
         if word_item.word in ret_dict.keys():
             duplicated_cnt += 1
         else:
-            ret_dict[word_item.word] = word_item.pronun_list
+            ret_dict[word_item.word] = copy.deepcopy(PreDictItem(pronun_list=word_item.pronun_list, pos=word_item.pos))
+
+        ''' 활용형에 대한 처리 '''
+        for cj_idx, conju_item in enumerate(word_item.conju_list):
+            # conju_item[0]: word, conju_item[1]: prounciation
+            conju_item = list(conju_item)
+            conju_item[1] = conju_item[1].replace('^', ' ').replace('-', '')
+            conju_item[1] = re.sub(r'[^가-힣]+', '', conju_item[1])
+            if conju_item[0] in ret_dict.keys():
+                conju_duplicated_cnt += 1
+            else:
+                ret_dict[conju_item[0]] = copy.deepcopy(PreDictItem(pronun_list=[conju_item[1]], pos=word_item.pos))
 
     print(f'[post_method][make_g2p_word_dictionary] ret_dict.keys().size: {len(ret_dict.keys())}, '
           f'duplicated_cnt: {duplicated_cnt}')

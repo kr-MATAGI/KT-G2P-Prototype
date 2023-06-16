@@ -131,7 +131,6 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
                     total_change_cnt += 1
                     all_our_sam_debug_info.append(our_sam_res)
 
-
             print(f"{p_idx}:\nraw: \n{input_sent}\ncandi: \n{pred_sent}\nref: \n{ans_sent}")
 
             references.append(ans_sent)
@@ -152,7 +151,7 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
           f"total.size: {len(eval_dataset)}")
     print(f"[run_electra_enc_dec][evaluate] Elapsed time: {eval_end_time - eval_start_time} seconds")
     print(f'[run_electra_enc_dec][evaluate] GPU Time: {sum(cuda_times)} seconds')
-    print(f"[run_electra_enc_dec][evaluate] our_sam - \ntotal_change_cnt: {total_change_cnt}")
+    print(f"[run_electra_enc_dec][evaluate] our_sam - total_change_cnt: {total_change_cnt}")
 
     eval_pbar.close()
 

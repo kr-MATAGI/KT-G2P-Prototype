@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List
-
+from typing import List, Tuple
 
 @dataclass
 class WordInfo:
@@ -15,6 +14,8 @@ class DictWordItem:
     word: str = ''
     word_type: str = ''
     word_unit: str = ''
+    # [word, pronuciation], wordinfo->conju_info->abbreviation_info/conjugation_info
+    conju_list: List[Tuple[str, str]] = field(default_factory=list)
     pronun_list: List[str] = field(default_factory=list)  # pronunciation_info -> pronunciation
     sense_no: str = ''  # senseinfo -> sense_no
     sense_type: str = ''  # senseinfo -> type
