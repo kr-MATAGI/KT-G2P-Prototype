@@ -339,7 +339,7 @@ class OurSamMakerByJson:
         print(f'[OurSamMakerByJson][__init__] __init__ !')
         self.TARGET_INFO = {
             'word_type': ['고유어', '한자어', '외래어'],
-            'pos': ['명사'],
+            'pos': ['명사', '동사', '형용사'],
             'sense_no': ['001'],
             'sense_type': ['일반어'],
             'origin_lang_type': ['영어', '고유어', '한자어']
@@ -502,7 +502,7 @@ if "__main__" == __name__:
 
         raw_word_item_pkl_path = '../data/dictionary/raw_dict_word_item.pkl'
         filtered_word_item_pkl_path = '../data/dictionary/filtered_dict_word_item.pkl'
-        b_make_raw_word_item_list = False
+        b_make_raw_word_item_list = True
 
         if b_make_raw_word_item_list:
             word_item_list = dict_maker_json_ver.make_dict_word_item_list(raw_json_dir_path='../data/our_sam')
