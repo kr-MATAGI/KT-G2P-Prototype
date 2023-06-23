@@ -155,6 +155,23 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
 
     eval_pbar.close()
 
+    ''' 결과 저장 '''
+    output_dir = os.path.join(args.output_dir, mode)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    output_eval_file = os.path.join(output_dir,
+                                    "{}-{}.txt".format(mode, global_steps) if global_steps else "{}.txt".format(mode))
+
+    with open(output_eval_file, "w") as f_w:
+        logger.info("***** Eval results on {} dataset *****".format(mode))
+
+        f_w.write("  wer = {}\n".format(wer_score))
+        f_w.write("  per = {}\n".format(per_score))
+        f_w.write("  acc = {}\n".format(total_correct / len(eval_dataset)))
+        f_w.write("  Elapsed time: {} seconds\n".format(eval_end_time - eval_start_time))
+        f_w.write("  GPU time: {} seconds".format(sum(cuda_times)))
+
     ''' 최종 결과에서 틀린 문장들 저장 '''
     with open('./results/bilstm_lstm/wrong_case.txt', mode='w', encoding='utf-8') as w_f:
         for w_idx, (w_inp_s, w_candi_s, w_ref_s) in enumerate(zip(wrong_case['input_sent'],
