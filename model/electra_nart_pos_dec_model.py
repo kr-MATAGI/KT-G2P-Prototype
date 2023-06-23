@@ -4,6 +4,11 @@ import torch.nn as nn
 from model.nonauto_nmt.pos_nart_decoder import Decoder
 from transformers import ElectraModel
 
+import copy
+import itertools
+from typing import List
+from hangul_utils import join_jamos, split_syllables
+
 #========================================================
 class ElectraNartPosDecModel(nn.Module):
 #========================================================
@@ -65,6 +70,97 @@ class ElectraNartPosDecModel(nn.Module):
         decoder_out = self.decoder.out(decoder_out)
 
         return decoder_out
+
+
+    def _decode_batch_sentences(self, input_ids):
+        '''
+            return은 아래와 같다
+                [
+                [CLS]', '런', '정', '페', '이', ' ', '화', '웨', '이', ' ', '회', '장', '은', '[SEP]',
+                ...,
+                ]
+        '''
+        decoded_batch_sent = []
+        for input_item in input_ids.tolist():
+            decoded_sent = self.tokenizer.decode(input_item)
+
+            # 분리를 위해 [CLS]/[SEP]는 뒤에 공백을 추가하고, [PAD]는 최대 길이 맞출려고 남겨둠
+            decoded_sent = decoded_sent.replace("[CLS]", "[CLS] ").replace("[SEP]", " [SEP]").replace("[PAD]", " [PAD]")
+            decoded_sent = decoded_sent.split(" ")
+
+            conv_eumjeol = []
+            for eojeol in decoded_sent:
+                if eojeol in ["[CLS]", "[SEP]", "[UNK]", "[PAD]", "[MASK]"]:
+                    if "[SEP]" == eojeol: # 문장의 맨 마지막 띄어쓰기 삭제
+                        conv_eumjeol = conv_eumjeol[:-1]
+                    conv_eumjeol.append(eojeol)
+                    continue
+                conv_eumjeol.extend(list(eojeol))
+                conv_eumjeol.append(" ")
+            decoded_batch_sent.append(conv_eumjeol)
+
+        return decoded_batch_sent
+
+    def _get_mutable_pron_list(self, time_step: int, batch_size: int, origin_sent: List[List[str]]):
+        ret_mutable_pron = []
+
+        for b_idx in range(batch_size):
+            origin_char = origin_sent[b_idx][time_step]
+
+            # TEST
+            # origin_char = '칙'
+
+            if origin_char in ["[CLS]", "[SEP]", "[PAD]", "[UNK]", "[MASK]"]:
+                ret_mutable_pron.append([self.out_tag2ids[origin_char]])
+                continue
+            elif " " == origin_char:
+                ret_mutable_pron.append([self.gap_ids])
+                continue
+
+            origin_jaso = split_syllables(origin_char)
+
+            ''' candi_* 가 붙은건 올 수 있는 자소들 '''
+            candi_initial = []
+            candi_vowel = []
+            candi_final = []
+            candi_initial = self.jaso_pair_dict["initial"][origin_jaso[0]]
+            candi_vowel = self.jaso_pair_dict["vowel"][origin_jaso[1]]
+
+            all_combination = []
+            if 3 == len(origin_jaso):
+                candi_final = copy.deepcopy(self.jaso_pair_dict["final"][origin_jaso[2]])
+                if " " in candi_final:
+                    empty_handle_list = list(itertools.product(candi_initial, candi_vowel))
+                    empty_handle_list = [join_jamos("".join(x)) for x in empty_handle_list]
+                    empty_handle_list = [self.out_tag2ids[x] for x in empty_handle_list]
+                    all_combination.extend(empty_handle_list)
+
+            if 0 == len(candi_final):
+                candi_combination = list(itertools.product(candi_initial, candi_vowel))
+            else:
+                candi_combination = list(itertools.product(candi_initial, candi_vowel, candi_final))
+            candi_combination = [join_jamos("".join(x).strip()) for x in candi_combination]
+            # print(candi_combination)
+            # input()
+            candi_combination = [self.out_tag2ids[x] for x in candi_combination]
+            all_combination.extend(candi_combination)
+
+            ret_mutable_pron.append(all_combination)
+
+        return ret_mutable_pron
+
+
+    def _get_score_handling_list(self, batch_size: int, out_vocab_size: int,
+                                 mutable_pron_list: List[List[int]]):
+        ret_unmutable_tensor = torch.zeros(batch_size, out_vocab_size,
+                                           device=self.config.device, dtype=torch.float32)
+
+        for b_idx, mutable_pron in enumerate(mutable_pron_list):
+            for vocab_ids in mutable_pron:
+                ret_unmutable_tensor[b_idx][vocab_ids] = 1.
+
+        return ret_unmutable_tensor
+
 
 def base_decoder_architecture(args):
     # maybe decoder

@@ -32,6 +32,6 @@
   "use_custom_vocab": false,
   "dec_layers": 1,
   "syllable_constraint_vocab": "./data/post_method/jaso_filter.json",
-  "do_post_method": false,
+  "do_post_method": true,
   "use_our_sam": false
 }
