@@ -123,7 +123,7 @@ class ElectraOnlyNART(nn.Module):
         decoder = cls.build_nat_decoder(args, tgt_dict, decoder_embed_tokens)
 
         args.mask_cls_sep = False
-        return ElectraOnlyDecModel(decoder, bert_encoder, src_berttokenizer, args.mask_cls_sep, args)
+        return ElectraOnlyNART(decoder, bert_encoder, src_berttokenizer, args.mask_cls_sep, args)
 
     @classmethod
     def build_nat_decoder(cls, args, tgt_dict, embed_tokens):
