@@ -455,6 +455,51 @@ class OurSamMakerByJson:
 
         return deq_word_item_list
 
+    def get_splited_kor_eng_dict(
+            self,
+            src_dict_path: str
+    ):
+        print(f'[OurSamMakerByJson][get_splited_kor_eng_dict] src_dict_path: {src_dict_path}')
+
+        # init
+        kor_dict: List[DictWordItem] = []
+        eng_dict: List[DictWordItem] = []
+
+        raw_dict: List[DictWordItem] = []
+        with open(src_dict_path, mode='rb') as r_f:
+            raw_dict = pickle.load(r_f)
+        print(f'[OurSamMakerByJson][get_splited_kor_eng_dict] raw_dict.size: {len(raw_dict)}')
+
+        # split
+        for raw_idx, raw_item in enumerate(raw_dict):
+            if '' == raw_item.origin_lang_type:
+                kor_dict.append(raw_item)
+            elif '영어' == raw_item.origin_lang_type:
+                eng_dict.append(raw_item)
+
+        print(f'[OurSamMakerByJson][get_splited_kor_eng_dict] kor_dict.size: {len(kor_dict)}')
+        print(f'[OurSamMakerByJson][get_splited_kor_eng_dict] eng_dict.size: {len(eng_dict)}')
+
+        return kor_dict, eng_dict
+
+    def make_lang_item_info_json(
+            self,
+            target_dict: List[DictWordItem],
+            lang: str
+    ):
+        print(f'[OurSamMakerByJson][make_lang_item_info_json] lang: {lang}, target_dict.size: {len(target_dict)}')
+
+        json_format = {
+            'root': []
+        }
+
+        target_dict.sort(key=lambda x: x.word)
+        for item in target_dict:
+            json_format['root'].append(item.to_json(ensure_ascii=False))
+        print(f'[OurSamMakerByJson][make_lang_item_info_json] json_format.root.size: {len(json_format["root"])}')
+
+        return json_format
+
 ### MAIN ###
 if "__main__" == __name__:
     print("[dict_maker] __main__")
@@ -502,7 +547,7 @@ if "__main__" == __name__:
 
         raw_word_item_pkl_path = '../data/dictionary/raw_dict_word_item.pkl'
         filtered_word_item_pkl_path = '../data/dictionary/filtered_dict_word_item.pkl'
-        b_make_raw_word_item_list = True
+        b_make_raw_word_item_list = False
 
         if b_make_raw_word_item_list:
             word_item_list = dict_maker_json_ver.make_dict_word_item_list(raw_json_dir_path='../data/our_sam')
@@ -522,4 +567,21 @@ if "__main__" == __name__:
 
         ''' Save '''
         with open(filtered_word_item_pkl_path, mode='wb') as f:
-            pickle.dump(list(dict_word_item_list), f)
+            ''' 정렬 ! '''
+            list(dict_word_item_list).sort(key=lambda x: x.word)
+            pickle.dump(dict_word_item_list, f)
+
+        #============================================================
+        ''' 만들어진 기분석 사전에서 한글과 영어 분리하기'''
+        kor_dict, eng_dict = dict_maker_json_ver.get_splited_kor_eng_dict(src_dict_path=filtered_word_item_pkl_path)
+
+        ''' Save '''
+        with open('../data/dictionary/kor_dict.json', mode='w', encoding='utf-8') as k_f:
+            kor_save_json = dict_maker_json_ver.make_lang_item_info_json(target_dict=kor_dict, lang='kor')
+            json.dump(kor_save_json, k_f, indent=4, ensure_ascii=False)
+            print(f'[our_sam_maker][__main__] Save Complete ! - Kor Dict')
+
+        with open('../data/dictionary/eng_dict.json', mode='w', encoding='utf-8') as e_f:
+            eng_save_json = dict_maker_json_ver.make_lang_item_info_json(target_dict=eng_dict, lang='eng')
+            json.dump(eng_save_json, e_f, indent=4, ensure_ascii=False)
+            print(f'[our_Sam_maker][__main__] Save Complete ! - Eng Dict')

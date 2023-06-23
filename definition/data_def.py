@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from dataclasses_json import dataclass_json
 from typing import List, Tuple
 
 @dataclass
@@ -9,6 +10,7 @@ class WordInfo:
     word_type: str
     source: str
 
+@dataclass_json
 @dataclass
 class DictWordItem:
     word: str = ''
