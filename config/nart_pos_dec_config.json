@@ -1,7 +1,7 @@
 {
   "task": "custom",
   "data_dir": "data",
-  "ckpt_dir": "ckpt-electra-non-pos-decoder-1-layer-retest",
+  "ckpt_dir": "ckpt-electra-non-pos-decoder-1-layer-susa-kor-230623",
   "train_npy": "./data/susa_kor/npy/only_dec/train.npy",
   "dev_npy": "./data/susa_kor/npy/only_dec/dev.npy",
   "test_npy": "./data/susa_kor/npy/only_dec/test.npy",
@@ -21,7 +21,7 @@
   "max_grad_norm": 1.0,
   "model_type": "electra-base",
   "model_name_or_path": "monologg/kocharelectra-base-discriminator",
-  "output_dir": "electra-non-pos-decoder-1-layer-retest",
+  "output_dir": "electra-non-pos-decoder-1-layer-susa-kor-230623",
   "seed": 42,
   "train_batch_size": 100,
   "eval_batch_size": 100,

@@ -337,7 +337,7 @@ if '__main__' == __name__:
     kor_susa_merger = KorSusaDataMerger(tokenizer_name='monologg/kocharelectra-base-discriminator',
                                         max_seq_len=256)
 
-    b_make_lstm = False
+    b_make_lstm = True
     b_make_only_dec = True
     if b_make_lstm:
         kor_susa_merger.make_merged_kor_susa_npy_for_lstm(

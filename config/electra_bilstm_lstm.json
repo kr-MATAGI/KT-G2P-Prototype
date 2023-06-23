@@ -1,12 +1,12 @@
 {
-  "ckpt_dir": "ckpt-electra-bilstm-lstm-susa-kor",
-  "train_npy": "./data/kor/npy/lstm/train.npy",
-  "dev_npy": "./data/kor/npy/lstm/dev.npy",
-  "test_npy": "./data/kor/npy/lstm/test.npy",
+  "ckpt_dir": "ckpt-electra-bilstm-lstm-susa-kor-230623",
+  "train_npy": "./data/susa_kor/npy/lstm/train.npy",
+  "dev_npy": "./data/susa_kor/npy/lstm/dev.npy",
+  "test_npy": "./data/susa_kor/npy/lstm/test.npy",
   "evaluate_test_during_training": true,
   "eval_all_checkpoints": false,
   "save_optimizer": false,
-  "do_train": false,
+  "do_train": true,
   "do_eval": true,
   "max_seq_len": 256,
   "num_train_epochs": 10,
@@ -17,7 +17,7 @@
   "max_grad_norm": 1.0,
   "model_type": "electra-base",
   "model_name_or_path": "monologg/kocharelectra-base-discriminator",
-  "output_dir": "electra-bilstm-lstm-susa-kor",
+  "output_dir": "electra-bilstm-lstm-susa-kor-230623",
   "seed": 42,
   "train_batch_size": 64,
   "eval_batch_size": 128,
@@ -28,5 +28,5 @@
   "use_custom_vocab": true,
   "do_post_method": false,
   "use_our_sam": true,
-  "our_sam_debug": true
+  "our_sam_debug": false
 }
