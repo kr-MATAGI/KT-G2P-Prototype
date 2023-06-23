@@ -25,7 +25,8 @@ class KorSusaDataMerger:
         susa_dir_path: str,
         b_use_custom_vocab: True,
         custom_vocab_path: str,
-        npy_save_path: str
+        npy_save_path: str,
+        b_use_kor_data: bool
     ):
         print(f'[KorSusaDataMerger][make_merged_kor_susa_npy] kor_npy_dir_path: {kor_npy_dir_path}\n'
               f'susa_dir_path: {susa_dir_path}\n'
@@ -107,13 +108,16 @@ class KorSusaDataMerger:
         # Merge kor + susa
         self._save_merged_npy(kor_npy_dict=train_kor_npy_dict,
                               susa_npy_dict=train_susa_npy_dict,
-                              save_path=npy_save_path, mode='train')
+                              save_path=npy_save_path, mode='train',
+                              b_use_kor_data=b_use_kor_data)
         self._save_merged_npy(kor_npy_dict=dev_kor_npy_dict,
                               susa_npy_dict=dev_susa_npy_dict,
-                              save_path=npy_save_path, mode='dev')
+                              save_path=npy_save_path, mode='dev',
+                              b_use_kor_data=b_use_kor_data)
         self._save_merged_npy(kor_npy_dict=test_kor_npy_dict,
                               susa_npy_dict=test_susa_npy_dict,
-                              save_path=npy_save_path, mode='test')
+                              save_path=npy_save_path, mode='test',
+                              b_use_kor_data=b_use_kor_data)
 
     def _load_susa_texts(
             self,
@@ -186,14 +190,21 @@ class KorSusaDataMerger:
         self,
         kor_npy_dict: Dict,
         susa_npy_dict: Dict,
-        save_path: str, mode: str
+        save_path: str, mode: str,
+        b_use_kor_data: bool
     ):
         merge_npy_dict = {}
         for key, val in susa_npy_dict.items():
             if 'length' in key:
-                merge_npy_dict[key] = np.hstack((kor_npy_dict[key], susa_npy_dict[key]))
+                if b_use_kor_data:
+                    merge_npy_dict[key] = np.hstack((kor_npy_dict[key], susa_npy_dict[key]))
+                else:
+                    merge_npy_dict[key] = susa_npy_dict[key]
             else:
-                merge_npy_dict[key] = np.vstack((kor_npy_dict[key], susa_npy_dict[key]))
+                if b_use_kor_data:
+                    merge_npy_dict[key] = np.vstack((kor_npy_dict[key], susa_npy_dict[key]))
+                else:
+                    merge_npy_dict[key] = susa_npy_dict[key]
             print(f'[KorSusaDataMerger][_save_merged_npy] {mode}.{key}.shape: {merge_npy_dict[key].shape}')
 
         for key, val in merge_npy_dict.items():
@@ -204,7 +215,8 @@ class KorSusaDataMerger:
         self,
         kor_npy_dir_path: str,
         susa_dir_path: str,
-        npy_save_path: str
+        npy_save_path: str,
+        b_use_kor_data: bool
     ):
         print(f'[KorSusaDataMerger][make_merged_kor_susa_npy_for_only_dec] kor_npy_dir_path: {kor_npy_dir_path}\n'
               f'susa_dir_path: {susa_dir_path}')
@@ -278,13 +290,16 @@ class KorSusaDataMerger:
         # Merge kor + susa
         self._save_merged_npy(kor_npy_dict=train_kor_npy_dict,
                               susa_npy_dict=train_susa_npy_dict,
-                              save_path=npy_save_path, mode='train')
+                              save_path=npy_save_path, mode='train',
+                              b_use_kor_data=b_use_kor_data)
         self._save_merged_npy(kor_npy_dict=dev_kor_npy_dict,
                               susa_npy_dict=dev_susa_npy_dict,
-                              save_path=npy_save_path, mode='dev')
+                              save_path=npy_save_path, mode='dev',
+                              b_use_kor_data=b_use_kor_data)
         self._save_merged_npy(kor_npy_dict=test_kor_npy_dict,
                               susa_npy_dict=test_susa_npy_dict,
-                              save_path=npy_save_path, mode='test')
+                              save_path=npy_save_path, mode='test',
+                              b_use_kor_data=b_use_kor_data)
 
     def _only_dec_susa_tokenization(
         self,
@@ -345,11 +360,13 @@ if '__main__' == __name__:
             susa_dir_path='../data/digits',
             b_use_custom_vocab=True,
             custom_vocab_path='../data/vocab/pron_eumjeol_vocab.json',
-            npy_save_path='../data/susa_kor/npy/lstm'
+            npy_save_path='../data/susa_kor/npy/lstm',
+            b_use_kor_data=False
         )
     if b_make_only_dec:
         kor_susa_merger.make_merged_kor_susa_npy_for_only_dec(
             kor_npy_dir_path='../data/kor/npy/only_dec',
             susa_dir_path='../data/digits',
-            npy_save_path='../data/susa_kor/npy/only_dec'
+            npy_save_path='../data/susa_kor/npy/only_dec',
+            b_use_kor_data=False
         )
