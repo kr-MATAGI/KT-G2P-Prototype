@@ -26,6 +26,12 @@ from utils.electra_only_dec_utils import (
     get_vocab_type_dictionary, load_electra_transformer_decoder_npy,
     ElectraOnlyDecDataset, make_electra_only_dec_inputs
 )
+from utils.post_method import (
+    make_g2p_word_dictionary, apply_our_sam_word_item,
+    save_our_sam_debug
+)
+
+from definition.data_def import DictWordItem, OurSamItem
 
 import platform
 if "Windows" == platform.system():
@@ -174,6 +180,10 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
     pred_tok_list = []
     ans_tok_list = []
 
+    # 우리말샘 기분석 삿전을 통해 바뀐 문장 갯수
+    all_our_sam_debug_info = List[OurSamItem] = []
+    total_change_cnt = 0
+
     criterion = nn.NLLLoss()
     eval_sampler = SequentialSampler(eval_datasets)
     eval_dataloader = DataLoader(eval_datasets, sampler=eval_sampler, batch_size=args.eval_batch_size)
@@ -222,39 +232,12 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
             ans_sent = re.sub(r"\[CLS\]|\[SEP\]|\[PAD\]", "", ans_sent)
 
             if args.use_our_sam:
-                mecab_res = mecab.pos(input_sent)
-                nn_pos_words = [x[0] for x in mecab_res if "NNG" == x[1] or "NNP" == x[1]]
-
-                # Change candidate by vocab
-                input_split = input_sent.split(" ")
-                pred_split = pred_sent.split(" ")
-                ans_split = ans_sent.split(" ")
-
-                for i_idx, input_word in enumerate(input_split):
-                    if len(input_split) != len(pred_split):
-                        break
-                    if input_word in our_sam_vocab.keys() and pred_split[i_idx] not in our_sam_vocab[
-                        input_word] and input_word in nn_pos_words:
-                        origin_pred_word = pred_split[i_idx]
-                        conv_word = our_sam_vocab[input_word][0]
-                        for proun in our_sam_vocab[input_word]:
-                            if proun == input_split[i_idx]:
-                                conv_word = proun
-                        pred_split[i_idx] = conv_word
-
-                        # change vocab_pronun to ref_pronun
-                        if ans_split[i_idx] != conv_word:
-                            print(ans_split[i_idx], conv_word)
-                            ans_split[i_idx] = conv_word
-                            print(" ".join(input_split))
-                            print(" ".join(pred_split))
-                            print(" ".join(ans_split))
-
-                        change_cnt += 1
-
-                input_sent = " ".join(input_split)
-                pred_sent = " ".join(pred_split)
-                ans_sent = " ".join(ans_split)
+                our_sam_res, is_change = apply_our_sam_word_item(our_sam_g2p_dict=our_sam_vocab,
+                                                                 input_sent=input_sent)
+                if is_change:
+                    pred_sent = our_sam_res.conv_sent
+                    total_change_cnt += 1
+                    all_our_sam_debug_info.append(our_sam_res)
 
             print(f"{d_idx}\n"
                   f"input_sent:\n{input_sent}\n"
@@ -360,12 +343,13 @@ def main(
     logger.info(f'src_vocab: {len(src_vocab)}')
     logger.info(f'dec_vocab: {len(dec_vocab)}')
 
-    # Load Our Sam Vocab
-    our_sam_vocab = None
-    with open(our_sam_path, mode='rb') as o_f:
-        our_sam_vocab = pickle.load(o_f)
-    logger.info(f'[__main__] our_sam_vocab.size: {len(our_sam_vocab)}')
-    logger.info(list(our_sam_vocab.items())[:10])
+
+    ''' 우리말 샘 문자열-발음열 사전 '''
+    our_sam_dict: List[DictWordItem] = []
+    with open(our_sam_path, mode='rb') as f:
+        our_sam_dict = pickle.load(f)
+        our_sam_dict = make_g2p_word_dictionary(our_sam_word_items=our_sam_dict)
+    print(f'[run_pos_attn_nart_dec][main] our_sam_dict_size: {len(our_sam_dict)}')
 
     # Build Model
     model = ElectraNartPosDecModel.build_model(args=config, tokenizer=tokenizer,
@@ -383,7 +367,7 @@ def main(
 
         global_step, tr_loss = train(config, model,
                                      train_datasets, dev_datasets,
-                                     src_vocab, dec_vocab, our_sam_vocab)
+                                     src_vocab, dec_vocab, our_sam_dict)
         logger.info(f'global_step: {global_step}, average_loss: {tr_loss}')
 
     # Do Eval
@@ -409,7 +393,8 @@ def main(
             model.load_state_dict(torch.load(checkpoint + '/model.pt'))
             model.to(config.device)
 
-            evaluate(config, model, test_datasets, "test", src_vocab, src_vocab, global_step, our_sam_vocab)
+            evaluate(config, model, test_datasets, "test",
+                     src_vocab, src_vocab, global_step, our_sam_dict)
 
 ### MAIN ###
 if '__main__' == __name__:
