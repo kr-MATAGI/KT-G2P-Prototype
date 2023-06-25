@@ -406,7 +406,7 @@ def main(
             model.load_state_dict(torch.load(checkpoint + '/model.pt'))
             model.to(args.device)
             evaluate(args, model, test_datasets, "test",
-                     src_vocab, ç, global_step, our_sam_dict)
+                     src_vocab, dec_vocab, global_step, our_sam_dict)
 
 ### MAIN ###
 if '__main__' == __name__:

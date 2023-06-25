@@ -403,7 +403,7 @@ def main(
             model.to(config.device)
 
             evaluate(config, model, test_datasets, "test",
-                     src_vocab, ç, global_step, our_sam_dict)
+                     src_vocab, dec_vocab, global_step, our_sam_dict)
 
 ### MAIN ###
 if '__main__' == __name__:
