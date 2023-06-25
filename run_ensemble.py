@@ -182,7 +182,7 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
 
     # wrong case
     wrong_df = pd.DataFrame(wrong_case)
-    wrong_df.to_csv(f"./results/electra_nart_dec/{mode}_wrong_case.csv", index=False, header=True)
+    wrong_df.to_csv(f"./results/ensemble/{mode}_wrong_case.csv", index=False, header=True)
 
     ''' 우리말 사전 적용 결과 저장 '''
     if args.use_our_sam and args.our_sam_debug:

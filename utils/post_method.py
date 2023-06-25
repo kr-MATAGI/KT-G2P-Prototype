@@ -68,13 +68,23 @@ def apply_our_sam_word_item(
     split_ans_sent = ans_sent.split(' ')
     for inp_idx, inp_item in enumerate(input_sent.split(' ')):
         include_flag = True
+        '''
+            NNG: 일반 명사
+            NNP: 고유 명사
+            VV : 동사
+            VA : 형용사
+        '''
+        b_include_nn = False
+        b_include_vv_va = False
         for tag in pos_list[inp_idx]:
-            if tag not in ['NNG', 'NNP']: # 1: NNP, 2: NNG
-                include_flag = False
+            if tag in ['NNG', 'NNP']: # 어절 안에 명사 종류가 포함되어 있는가
+                b_include_nn = True
+                break
+            if tag in ['VV', 'VA']: # 어절 안에 동사, 형용사가 포함되어 있는가?
+                b_include_vv_va = True
                 break
 
-        if not include_flag:
-            continue
+
 
         if (inp_item in our_sam_g2p_dict.keys()) and \
                 (split_pred_sent[inp_idx] not in our_sam_g2p_dict[inp_item].pronun_list):
