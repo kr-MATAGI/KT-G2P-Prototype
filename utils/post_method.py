@@ -76,19 +76,20 @@ def apply_our_sam_word_item(
         if not include_flag:
             continue
 
-        if (inp_item in our_sam_g2p_dict.keys()) and (inp_item not in our_sam_g2p_dict[inp_item]):
+        if (inp_item in our_sam_g2p_dict.keys()) and \
+                (split_pred_sent[inp_idx] not in our_sam_g2p_dict[inp_item].pronun_list):
             '''
                 복수 표준 발음 처리 (임시)
                     - key-value 에서 value는 발음열들의 목록
                     - 이 안에 없다면 현재 예측된 발음열을 교체
             '''
-            split_pred_sent[inp_idx] = our_sam_g2p_dict[inp_item][0]
+            split_pred_sent[inp_idx] = our_sam_g2p_dict[inp_item].pronun_list[0]
             is_change = True
 
             # For Debug
             debug_info.input_word.append(inp_item)
             debug_info.pred_word.append(split_pred_sent[inp_idx])
-            debug_info.our_sam_word.append(our_sam_g2p_dict[inp_item])
+            debug_info.our_sam_word.append(our_sam_g2p_dict[inp_item].pronun_list)
             debug_info.ans_word.append(split_ans_sent[inp_idx])
     # end loop, inp_item
 

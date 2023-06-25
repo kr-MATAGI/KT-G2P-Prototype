@@ -181,7 +181,7 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
     ans_tok_list = []
 
     # 우리말샘 기분석 삿전을 통해 바뀐 문장 갯수
-    all_our_sam_debug_info = List[OurSamItem] = []
+    all_our_sam_debug_info: List[OurSamItem] = []
     total_change_cnt = 0
 
     criterion = nn.NLLLoss()
@@ -233,7 +233,10 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
 
             if args.use_our_sam:
                 our_sam_res, is_change = apply_our_sam_word_item(our_sam_g2p_dict=our_sam_vocab,
-                                                                 input_sent=input_sent)
+                                                                 mecab=mecab,
+                                                                 input_sent=input_sent,
+                                                                 pred_sent=pred_sent,
+                                                                 ans_sent=ans_sent)
                 if is_change:
                     pred_sent = our_sam_res.conv_sent
                     total_change_cnt += 1
@@ -287,6 +290,13 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
     # wrong case
     wrong_df = pd.DataFrame(wrong_case)
     wrong_df.to_csv(f"./results/electra_nart_dec/{mode}_wrong_case.csv", index=False, header=True)
+
+    ''' 우리말 사전 적용 결과 저장 '''
+    if args.use_our_sam and args.our_sam_debug:
+        save_our_sam_debug(all_item_save_path='./results/electra_nart_dec/our_sam_all.txt',
+                           wrong_item_save_path='./results/electra_nart_dec/our_sam_wrong.txt',
+                           our_sam_debug_list=all_our_sam_debug_info)
+        print(f'[run_electra_enc_dec][evaluate] OurSamDebug info Save Complete !')
 
 #==================================================================
 def main(
@@ -402,7 +412,7 @@ if '__main__' == __name__:
 
     config_path = './config/nart_pos_dec_config.json'
     custom_vocab_path = './data/vocab/pron_eumjeol_vocab.json'
-    our_sam_path = './data/dictionary/our_sam_std_dict.pkl'
+    our_sam_path = './data/dictionary/filtered_dict_word_item.pkl'
     jaso_post_proc_path = './data/post_method/jaso_filter.json'
 
     main(config_path=config_path,
