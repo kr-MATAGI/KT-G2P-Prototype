@@ -28,10 +28,10 @@ from utils.electra_only_dec_utils import (
 )
 from utils.post_method import (
     make_g2p_word_dictionary, apply_our_sam_word_item,
-    save_our_sam_debug
+    save_our_sam_debug, get_dict_items_info, PreDictItem
 )
 
-from definition.data_def import DictWordItem, OurSamItem
+from definition.data_def import OurSamItem
 
 import platform
 if "Windows" == platform.system():
@@ -354,10 +354,11 @@ def main(
     logger.info(f'dec_vocab: {len(dec_vocab)}')
 
     ''' 우리말 샘 문자열-발음열 사전 '''
-    our_sam_dict: List[DictWordItem] = []
+    our_sam_dict: Dict[str, PreDictItem] = {}
     with open(our_sam_path, mode='rb') as f:
         our_sam_dict = pickle.load(f)
         our_sam_dict = make_g2p_word_dictionary(our_sam_word_items=our_sam_dict)
+    get_dict_items_info(our_sam_dict)
     print(f'[run_pos_attn_nart_dec][main] our_sam_dict_size: {len(our_sam_dict)}')
 
     # Build Model

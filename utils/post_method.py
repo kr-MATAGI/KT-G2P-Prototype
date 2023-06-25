@@ -185,6 +185,22 @@ def save_our_sam_debug(
 
     print(f"[post_method][save_debug_txt] wrong_case_cnt: {wrong_case_cnt}")
 
+#========================================================
+def get_dict_items_info(target_dict: Dict[str, PreDictItem]):
+#========================================================
+    nn_cnt = 0
+    vv_cnt = 0
+    va_cnt = 0
+    total_cnt = len(target_dict)
+    for idx, (key, dict_item) in enumerate(target_dict.items()):
+        if '명사' == dict_item.pos:
+            nn_cnt += 1
+        elif '동사' == dict_item.pos:
+            vv_cnt += 1
+        elif '형용사' == dict_item.pos:
+            va_cnt += 1
+    print(f'[post_method][get_dict_item_info] 갯수 - 총합: {total_cnt} 명사: {nn_cnt}, 동사: {vv_cnt}, 형용사: {va_cnt}')
+
 ### MAIN ###
 if '__main__' == __name__:
     print(f'[post_method][__main__] MAIN !')
