@@ -77,13 +77,13 @@ def apply_our_sam_word_item(
         '''
         b_include_nn = False
         b_include_vv_va = False
-        for tag in pos_list[inp_idx]:
+        for t_idx, tag in enumerate(pos_list[inp_idx]):
             if tag in ['NNG', 'NNP']: # 어절 안에 명사 종류가 포함되어 있는가
                 ''' 명사가 포함된경우 명사만 포함되어있는가 '''
                 b_include_nn = True
             else:
                 b_include_nn = False
-            if tag in ['VV', 'VA'] and 0 == inp_idx: # 어절 안에 동사, 형용사가 포함되어 있는가?
+            if tag in ['VV', 'VA'] and 0 == t_idx: # 어절 안에 동사, 형용사가 포함되어 있는가?
                 ''' 동사, 형용사가 포함된 경우 첫 품사가 동사 or 형용사인가 '''
                 b_include_vv_va = True
                 break
@@ -105,6 +105,7 @@ def apply_our_sam_word_item(
             debug_info.input_word.append(inp_item)
             debug_info.pred_word.append(split_pred_sent[inp_idx])
             debug_info.our_sam_word.append(our_sam_g2p_dict[inp_item].pronun_list)
+            debug_info.pos = our_sam_g2p_dict[inp_item].pos
             debug_info.ans_word.append(split_ans_sent[inp_idx])
     # end loop, inp_item
 
@@ -161,7 +162,7 @@ def save_our_sam_debug(
             all_f.write(f"변경된 문장:\n{debug_item.conv_sent}\n\n")
 
             all_f.write("=========================\n")
-            all_f.write(f"입력  예측  변경  정답\n")
+            all_f.write(f"입력  예측  변경  품사  정답\n")
             for inp, pred, conv, ans in zip(debug_item.input_word, debug_item.pred_word,
                                             debug_item.our_sam_word, debug_item.ans_word):
                 all_f.write(f"{inp}\t{pred}\t{conv}\t{ans}\n")
@@ -177,10 +178,10 @@ def save_our_sam_debug(
                 wrong_f.write(f"변경된 문장:\n{debug_item.conv_sent}\n\n")
 
                 wrong_f.write("=========================\n")
-                wrong_f.write(f"입력  예측  변경  정답\n")
+                wrong_f.write(f"입력  예측  변경  품사  정답\n")
                 for inp, pred, conv, ans in zip(debug_item.input_word, debug_item.pred_word,
                                                 debug_item.our_sam_word, debug_item.ans_word):
-                    wrong_f.write(f"{inp}\t{pred}\t{conv}\t{ans}\n")
+                    wrong_f.write(f"{inp}\t{pred}\t{conv}\t{debug_item.pos}\t{ans}\n")
                 wrong_f.write("=========================\n\n")
 
     print(f"[post_method][save_debug_txt] wrong_case_cnt: {wrong_case_cnt}")

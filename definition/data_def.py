@@ -144,6 +144,7 @@ class OurSamItem:
     input_word: List[str] = field(default_factory=list)
     pred_word: List[str] = field(default_factory=list)
     our_sam_word: List[str] = field(default_factory=list)
+    pos: str = 'None'
     ans_word: List[str] = field(default_factory=list)
 
 ### main ###
