@@ -7,27 +7,27 @@ import pickle
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import RandomSampler, SequentialSampler, DataLoader
 
 from utils.kocharelectra_tokenization import KoCharElectraTokenizer
 from transformers import ElectraConfig, get_linear_schedule_with_warmup
 from model.electra_nart_pos_dec_model import ElectraNartPosDecModel
-from definition.data_def import DictWordItem
+from definition.data_def import OurSamItem
 
 import time
 from attrdict import AttrDict
 from typing import Dict, List
 from tqdm import tqdm
+import pandas as pd
 import evaluate as hug_eval
 
 from run_utils import (
-    make_digits_ensemble_data, G2P_Dataset,
-    init_logger, make_inputs_from_batch,
-    make_eojeol_mecab_res,
-    print_args, set_seed
+    init_logger, print_args, set_seed, make_digits_ensemble_data
 )
+
 from utils.post_method import (
-    make_g2p_word_dictionary, save_our_sam_debug
+    make_g2p_word_dictionary, save_our_sam_debug, apply_our_sam_word_item
 )
 from utils.electra_only_dec_utils import (
     get_vocab_type_dictionary, load_electra_transformer_decoder_npy,
@@ -50,20 +50,16 @@ numeral_model = Label2Num()
 tokenizer = KoCharElectraTokenizer.from_pretrained('monologg/kocharelectra-base-discriminator')
 
 #===============================================================
-def evaluate(args, model, tokenizer, eval_dataset, mode,
-             output_vocab: Dict[str, int], our_sam_dict: Dict[str, str], global_steps: str):
+def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step, our_sam_vocab):
 #===============================================================
     # init
-    eval_sampler = SequentialSampler(eval_dataset)
-    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
-
-    output_ids2tok = {v: k for k, v in output_vocab.items()}
-
-    # Eval
     logger.info("***** Running evaluation on {} dataset *****".format(mode))
 
+    # init
+    mecab = Mecab()
+
     eval_loss = 0.0
-    nb_eval_steps = 0
+    eval_steps = 0
 
     references = []
     candidates = []
@@ -71,162 +67,143 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
 
     wrong_case = {
         "input_sent": [],
-        "candi_sent": [],
-        "ref_sent": []
+        "pred_sent": [],
+        "ans_sent": []
     }
 
-    # Test Batch가 모두 끝나고 Decoding 되도록
-    inputs_list = []
-    pred_list = []
-    ans_list = []
+    batch_src_tok_list = []
+    pred_tok_list = []
+    ans_tok_list = []
 
-    criterion = nn.CrossEntropyLoss()
+    # 우리말샘 기분석 삿전을 통해 바뀐 문장 갯수
+    all_our_sam_debug_info: List[OurSamItem] = []
+    total_change_cnt = 0
+
+    criterion = nn.NLLLoss()
+    eval_sampler = SequentialSampler(eval_datasets)
+    eval_dataloader = DataLoader(eval_datasets, sampler=eval_sampler, batch_size=args.eval_batch_size)
     eval_pbar = tqdm(eval_dataloader)
 
-    eval_start_time = time.time()
-    cuda_starter = torch.cuda.Event(enable_timing=True)
-    cuda_ender = torch.cuda.Event(enable_timing=True)
+    cuda_starter, cuda_ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
     cuda_times = []
-    for batch in eval_pbar:
-        model.eval()
 
+    model.eval()
+    start_time = time.time()
+    for batch in eval_pbar:
+        torch.cuda.synchronize()
         with torch.no_grad():
-            inputs = make_inputs_from_batch(batch, device=args.device)
+            inputs = make_electra_only_dec_inputs(batch)
             inputs["mode"] = "eval"
 
             cuda_starter.record()
-            logits = model(**inputs)  # predict [batch, seq_len] List
+            output = model(**inputs)
             cuda_ender.record()
             torch.cuda.synchronize()
-
             cuda_times.append(cuda_starter.elapsed_time(cuda_ender) / 1000)
 
-            loss = criterion(logits.view(-1, args.out_vocab_size), inputs["labels"].view(-1).to(args.device))
+            output = F.log_softmax(output, -1)
+            loss = criterion(output.reshape(-1, len(dec_vocab)), batch["tgt_tokens"].view(-1).to(args.device))
+
             eval_loss += loss.mean().item()
 
-            inputs_list.append(inputs["input_ids"].detach().cpu())
-            pred_list.append(torch.argmax(logits, dim=-1).detach().cpu())
-            ans_list.append(inputs["labels"].detach().cpu())
+            batch_src_tok_list.append(inputs["src_tokens"].detach().cpu())
+            pred_tok_list.append(torch.argmax(output, -1).detach().cpu())
+            ans_tok_list.append(batch["tgt_tokens"].detach().cpu())
 
-        nb_eval_steps += 1
-        eval_pbar.set_description("Eval Loss - %.04f" % (eval_loss / nb_eval_steps))
+        eval_steps += 1
+        eval_pbar.set_description("Eval Loss - %.04f" % (eval_loss / eval_steps))
     # end loop
-    eval_end_time = time.time()
+    end_time = time.time()
 
-    ''' 우리말샘 말뭉치-발음열 변경 Debug '''
-    mecab = Mecab()
-    change_count = 0
-    our_sam_debug_list: List[OurSamItem] = []
-    fixed_our_sam_list: List[OurSamItem] = []
-    wrong_our_sam_list: List[OurSamItem] = []
-    for (input_item, pred_item, ans_item) in zip(inputs_list, pred_list, ans_list):
-        for p_idx, (input_i, pred, lab) in enumerate(zip(input_item, pred_item, ans_item)):
-            input_sent = tokenizer.decode(input_i)
-            input_sent = input_sent.replace("[CLS]", "").replace("[SEP]", "").replace("[PAD]", "").strip()
+    # Decode
+    for src_tok, pred_tok, ans_tok in zip(batch_src_tok_list, pred_tok_list, ans_tok_list):
+        for d_idx, (input_i, pred, lab) in enumerate(zip(src_tok, pred_tok, ans_tok)):
+            input_sent = "".join([src_vocab[x] for x in input_i.tolist()]).strip()
+            pred_sent = "".join([dec_vocab[x] for x in pred.tolist()]).strip()
+            ans_sent = "".join([dec_vocab[x] for x in lab.tolist()]).strip()
 
-            pred_sent = "".join([output_ids2tok[x] for x in pred.tolist()])
-            # candi_str = tokenizer.decode(pred.tolist())
-            pred_sent = pred_sent.replace("[CLS]", "").replace("[SEP]", "").replace("[PAD]", "").strip()
+            input_sent = re.sub(r"\[CLS\]|\[SEP\]|\[PAD\]", "", input_sent)
+            pred_sent = re.sub(r"\[CLS\]|\[SEP\]|\[PAD\]", "", pred_sent)
+            ans_sent = re.sub(r"\[CLS\]|\[SEP\]|\[PAD\]", "", ans_sent)
 
-            ans_sent = "".join([output_ids2tok[x] for x in lab.tolist()])
-            # ref_str = tokenizer.decode(lab.tolist())
-            ans_sent = ans_sent.replace("[CLS]", "").replace("[SEP]", "").replace("[PAD]", "").strip()
-
-            ''' 우리말 샘 문자열-발음열 대치 '''
-            ''' debug '''
             if args.use_our_sam:
-                our_sam_debug = OurSamItem(
-                    input_sent=input_sent, pred_sent=pred_sent, ans_sent=ans_sent
-                )
+                our_sam_res, is_change = apply_our_sam_word_item(our_sam_g2p_dict=our_sam_vocab,
+                                                                 mecab=mecab,
+                                                                 input_sent=input_sent,
+                                                                 pred_sent=pred_sent,
+                                                                 ans_sent=ans_sent)
+                if is_change:
+                    pred_sent = our_sam_res.conv_sent
+                    total_change_cnt += 1
+                    all_our_sam_debug_info.append(our_sam_res)
 
-                mecab_res = mecab.pos(input_sent)
-                mecab_res = make_eojeol_mecab_res(input_sent, mecab_res)
-                pos_list = []
-                for res_item in mecab_res:
-                    eojeol_pos = []
-                    for morp_item in res_item:
-                        eojeol_pos.extend(morp_item[-1])
-                    pos_list.append(eojeol_pos)
-                mecab_res = pos_list
-                # [[('저', ['NP']), ('를', ['JKO'])], [('부르', ['VV']), ('셨', ['EP', 'EP']), ('나요', ['EC'])]]
-                # [['NP', 'JKO'], ['VV', 'EP', 'EP', 'EC']]
+            print(f"{d_idx}\n"
+                  f"input_sent:\n{input_sent}\n"
+                  f"pred_sent:\n{pred_sent}\n"
+                  f"ans_snet:\n{ans_sent}\n")
 
-                cp_pred_sent = copy.deepcopy(pred_sent.split(" "))
-                split_ans_sent = ans_sent.split(" ")
-                for rs_idx, raw_sp_item in enumerate(input_sent.split(" ")):
-                    include_flag = True
-                    for tag in mecab_res[rs_idx]:
-                        if tag not in ["NNG", "NNP"]:  # 1: NNP, 2: NNG
-                            include_flag = False
-                            break
-                    if not include_flag:
-                        continue
-                    if raw_sp_item in our_sam_dict.keys():
-                        our_sam_debug.input_word.append(raw_sp_item)
-                        our_sam_debug.pred_word.append(cp_pred_sent[rs_idx])
-                        our_sam_debug.our_sam_word.append(our_sam_dict[raw_sp_item])
-                        our_sam_debug.ans_word.append(split_ans_sent[rs_idx])
-
-                        change_count += 1
-                        cp_pred_sent[rs_idx] = our_sam_dict[raw_sp_item]
-
-                origin_pred_sent = copy.deepcopy(pred_sent)
-                pred_sent = " ".join(cp_pred_sent).strip()
-                our_sam_debug.conv_sent = pred_sent
-                if 0 < len(our_sam_debug.input_word):
-                    our_sam_debug_list.append(our_sam_debug)
-
-                    if origin_pred_sent != pred_sent and pred_sent == ans_sent:
-                        fixed_our_sam_list.append(our_sam_debug)
-                    elif origin_pred_sent != pred_sent and pred_sent != ans_sent:
-                        wrong_our_sam_list.append(our_sam_debug)
-
-            # print(f"{p_idx}:\nraw: \n{input_sent}\ncandi: \n{pred_sent}\nref: \n{ans_sent}")
-
-            references.append(ans_sent)
             candidates.append(pred_sent)
+            references.append(ans_sent)
+
             if ans_sent == pred_sent:
                 total_correct += 1
             else:
                 wrong_case["input_sent"].append(input_sent)
-                wrong_case["candi_sent"].append(pred_sent)
-                wrong_case["ref_sent"].append(ans_sent)
+                wrong_case["pred_sent"].append(pred_sent)
+                wrong_case["ans_sent"].append(ans_sent)
+    # end loop, decode
 
     wer_score = hug_eval.load("wer").compute(predictions=candidates, references=references)
     per_score = hug_eval.load("cer").compute(predictions=candidates, references=references)
-    print(f"[run_electra_enc_dec][evaluate] global_steps: {global_steps}")
-    print(f"[run_electra_enc_dec][evaluate] wer_score: {wer_score * 100}, size: {len(candidates)}")
-    print(f"[run_electra_enc_dec][evaluate] per_score: {per_score * 100}, size: {len(candidates)}")
-    print(f"[run_electra_enc_dec][evaluate] s_acc: {total_correct / len(eval_dataset) * 100}, size: {total_correct}, "
-          f"total.size: {len(eval_dataset)}")
-    print(f"[run_electra_enc_dec][evaluate] Elapsed time: {eval_end_time - eval_start_time} seconds")
-    print(f'[run_electra_enc_dec][evaluate] GPU Time: {sum(cuda_times)} seconds')
-    print(f"[run_electra_enc_dec][evaluate] our_sam change count: {change_count}")
+    print(f"[run_ensemble][evaluate] wer_score: {wer_score * 100}, size: {len(candidates)}")
+    print(f"[run_ensemble][evaluate] per_score: {per_score * 100}, size: {len(candidates)}")
+    print(f"[run_ensemble][evaluate] s_acc: {total_correct / len(eval_datasets) * 100}, size: {total_correct}, "
+          f"total.size: {len(eval_datasets)}")
+    print(f"[run_ensemble][evaluate] Elapsed time: {end_time - start_time} seconds")
+    print(f'[run_ensemble][evaluate] CUDA time: {sum(cuda_times)} seconds')
 
+    logger.info("---Eval End !")
     eval_pbar.close()
 
-    ''' Save Wrong Case'''
-    with open('./results/bilstm_lstm/wrong_case.txt', mode='w', encoding='utf-8') as w_f:
-        for w_idx, (w_inp_s, w_candi_s, w_ref_s) in enumerate(zip(wrong_case['input_sent'],
-                                                                  wrong_case['candi_sent'], wrong_case['ref_sent'])):
-            w_f.write(str(w_idx) + '\n')
-            w_f.write(w_inp_s + '\n')
-            w_f.write(w_candi_s + '\n')
-            w_f.write(w_ref_s + '\n')
-            w_f.write('==================\n\n')
+    # Save score
+    output_dir = os.path.join(args.output_dir, mode)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-    ''' 우리말 샘 변경 사항 파일로 저장'''
-    save_debug_txt("./results/bilstm_lstm/our_sam_debug.txt", our_sam_debug_list)
-    save_debug_txt("./results/bilstm_lstm/fixed_our_sam_debug.txt", fixed_our_sam_list)
-    save_debug_txt("./results/bilstm_lstm/wrong_our_sam_debug.txt", wrong_our_sam_list)
+    output_eval_file = os.path.join(output_dir,
+                                    "{}-{}.txt".format(mode, global_step) if global_step else "{}.txt".format(mode))
+
+    with open(output_eval_file, "w") as f_w:
+        logger.info("***** Eval results on {} dataset *****".format(mode))
+
+        f_w.write("  wer = {}\n".format(wer_score))
+        f_w.write("  per = {}\n".format(per_score))
+        f_w.write("  acc = {}\n".format(total_correct / len(eval_datasets)))
+        f_w.write("  Elapsed time: {} seconds\n".format(end_time - start_time))
+        f_w.write("  GPU time: {} seconds".format(sum(cuda_times)))
+
+    # wrong case
+    wrong_df = pd.DataFrame(wrong_case)
+    wrong_df.to_csv(f"./results/electra_nart_dec/{mode}_wrong_case.csv", index=False, header=True)
+
+    ''' 우리말 사전 적용 결과 저장 '''
+    if args.use_our_sam and args.our_sam_debug:
+        save_our_sam_debug(all_item_save_path='./results/ensemble/our_sam_all.txt',
+                           wrong_item_save_path='./results/ensemble/our_sam_wrong.txt',
+                           our_sam_debug_list=all_our_sam_debug_info)
+        print(f'[run_ensemble][evaluate] OurSamDebug info Save Complete !')
 
 #===============================================================
-def train(args, model, tokenizer, train_dataset, dev_dataset,
-          output_vocab: Dict[str, int], our_sam_dict):
+def train(args, model, train_datasets, dev_datasets, src_vocab, dec_vocab, our_sam_vocab):
 #===============================================================
-    # init
-    train_data_len = len(train_dataset)
-    t_total = (train_data_len // args.gradient_accumulation_steps * args.num_train_epochs)
+    train_data_size = len(train_datasets)
+
+    if args.max_steps > 0:
+        t_total = args.max_steps
+        args.num_train_epochs = args.max_steps // (train_data_size // args.gradient_accumulation_steps) + 1
+    else:
+        t_total = (train_data_size // args.gradient_accumulation_steps * args.num_train_epochs)
+    logger.info(f"[train] t_toal: {t_total}")
 
     # Prepare optimizer and schedule (linear warmup and decay)
     no_decay = ['bias', 'LayerNorm.weight']
@@ -235,6 +212,7 @@ def train(args, model, tokenizer, train_dataset, dev_dataset,
          'weight_decay': args.weight_decay},
         {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
     ]
+    # optimizer_grouped_parameters = model.parameters()
 
     # eps : 줄이기 전/후의 lr차이가 eps보다 작으면 무시한다.
     optimizer = torch.optim.AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
@@ -250,9 +228,9 @@ def train(args, model, tokenizer, train_dataset, dev_dataset,
         optimizer.load_state_dict(torch.load(os.path.join(args.model_name_or_path, "optimizer.pt")))
         scheduler.load_state_dict(torch.load(os.path.join(args.model_name_or_path, "scheduler.pt")))
 
-    # Train!
+    # Train !
     logger.info("***** Running training *****")
-    logger.info("  Num examples = %d", len(train_dataset))
+    logger.info("  Num examples = %d", len(train_datasets))
     logger.info("  Num Epochs = %d", args.num_train_epochs)
     logger.info("  Total train batch size = %d", args.train_batch_size)
     logger.info("  Gradient Accumulation steps = %d", args.gradient_accumulation_steps)
@@ -263,34 +241,34 @@ def train(args, model, tokenizer, train_dataset, dev_dataset,
     global_step = 0
     tr_loss = 0.0
 
-    criterion = nn.CrossEntropyLoss()
-    train_sampler = RandomSampler(train_dataset)
+    criterion = nn.NLLLoss()
+    train_sampler = RandomSampler(train_datasets)
 
     model.zero_grad()
     for epoch in range(args.num_train_epochs):
         model.train()
-        train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size)
+
+        train_dataloader = DataLoader(train_datasets, sampler=train_sampler, batch_size=args.train_batch_size)
         pbar = tqdm(train_dataloader)
+
         for step, batch in enumerate(pbar):
-            inputs = make_inputs_from_batch(batch, device=args.device)
+            inputs = make_electra_only_dec_inputs(batch)
             inputs["mode"] = "train"
 
-            logits = model(**inputs)
-            loss = criterion(logits.view(-1, args.out_vocab_size), inputs["labels"].view(-1).to(args.device))
+            output = model(**inputs)
+            output = F.log_softmax(output, -1)
 
-            if args.gradient_accumulation_steps > 1:
-                loss = loss / args.gradient_accumulation_steps
-
+            loss = criterion(output.reshape(-1, len(dec_vocab)), batch["tgt_tokens"].view(-1).to(args.device))
             loss.backward()
+            optimizer.step()
+
+            model.zero_grad()
             tr_loss += loss.item()
 
             if (step + 1) % args.gradient_accumulation_steps == 0 or \
-                    (len(train_dataloader) <= args.gradient_accumulation_steps and (step + 1) == len(train_dataloader)):
+                    (len(train_datasets) <= args.gradient_accumulation_steps and (step + 1) == len(train_datasets)):
                 torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
 
-                optimizer.step()
-                scheduler.step()
-                model.zero_grad()
                 global_step += 1
 
                 pbar.set_description("Train Loss - %.04f" % (tr_loss / global_step))
@@ -299,11 +277,8 @@ def train(args, model, tokenizer, train_dataset, dev_dataset,
                     output_dir = os.path.join(args.output_dir, "checkpoint-{}".format(global_step))
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
-                    model_to_save = (
-                        model.module if hasattr(model, "module") else model
-                    )
-                    model_to_save.save_pretrained(output_dir)
 
+                    torch.save(model.state_dict(), os.path.join(output_dir, "model.pt"))
                     torch.save(args, os.path.join(output_dir, "training_args.bin"))
                     logger.info("Saving samples checkpoint to {}".format(output_dir))
 
@@ -314,10 +289,12 @@ def train(args, model, tokenizer, train_dataset, dev_dataset,
 
                 if (args.logging_steps > 0 and global_step % args.logging_steps == 0) and \
                         args.evaluate_test_during_training:
-                    evaluate(args, model, tokenizer, dev_dataset, "dev",
-                             output_vocab, our_sam_dict, global_steps=global_step)
+                    evaluate(args, model, dev_datasets, "dev", src_vocab, dec_vocab, global_step, our_sam_vocab)
 
-        logger.info("  Epoch Done= %d", epoch + 1)
+            if args.max_steps > 0 and global_step > args.max_steps:
+                break
+
+        logger.info("   Epoch Done= %d", epoch + 1)
         pbar.close()
 
     return global_step, tr_loss / global_step
@@ -355,7 +332,6 @@ def main(
     print_args(args, logger)
     set_seed(args.seed)
 
-
     # Load Vocab
     '''
         [PAD] : 0
@@ -382,7 +358,7 @@ def main(
     print(f'[run_digits_ensemble][main] post_proc_dict.size: {len(post_proc_dict.keys())}')
 
     ''' 우리말 샘 문자열-발음열 사전 '''
-    our_sam_dict: List[DictWordItem] = []
+    our_sam_dict = {}
     with open(our_sam_path, mode='rb') as f:
         our_sam_dict = pickle.load(f)
         our_sam_dict = make_g2p_word_dictionary(our_sam_word_items=our_sam_dict)
@@ -400,18 +376,19 @@ def main(
                                                    tokenizer=tokenizer, decode_vocab=dec_vocab)
         dev_datasets = make_digits_ensemble_data(data_path=args.data_pkl, mode='dev',
                                                  tokenizer=tokenizer, decode_vocab=dec_vocab)
-        train_datasets = G2P_Dataset(item_dict=train_datasets, labels=train_datasets['labels'])
-        dev_datasets = G2P_Dataset(item_dict=dev_datasets, labels=dev_datasets['labels'])
+        train_datasets = ElectraOnlyDecDataset(item_dict=train_datasets)
+        dev_datasets = ElectraOnlyDecDataset(item_dict=dev_datasets)
 
-        global_step, tr_loss = train(args, model, tokenizer, train_datasets, dev_datasets,
-                                     dec_vocab, our_sam_dict)
+        global_step, tr_loss = train(args, model,
+                                     train_datasets, dev_datasets,
+                                     src_vocab, dec_vocab, our_sam_dict)
         logger.info(f'global_step = {global_step}, average loss = {tr_loss}')
 
     # Do Eval
     if args.do_eval:
         test_datasets = make_digits_ensemble_data(data_path=args.data_pkl, mode='test',
                                                   tokenizer=tokenizer, decode_vocab=dec_vocab)
-        test_datasets = G2P_Dataset(item_dict=test_datasets, labels=test_datasets['labels'])
+        test_datasets = ElectraOnlyDecDataset(item_dict=test_datasets)
         checkpoints = list(os.path.dirname(c) for c in
                            sorted(glob.glob(args.output_dir + "/**/" + "model.pt", recursive=True),
                                   key=lambda path_with_step: list(map(int, re.findall(r"\d+", path_with_step)))[-1]))
@@ -430,9 +407,8 @@ def main(
                                                        post_proc_dict=post_proc_dict)
             model.load_state_dict(torch.load(checkpoint + '/model.pt'))
             model.to(args.device)
-            evaluate(args, model, tokenizer, test_datasets, mode="test",
-                     output_vocab=dec_vocab,
-                     our_sam_dict=our_sam_dict, global_steps=global_step)
+            evaluate(args, model, test_datasets, "test",
+                     src_vocab, ç, global_step, our_sam_dict)
 
 ### MAIN ###
 if '__main__' == __name__:

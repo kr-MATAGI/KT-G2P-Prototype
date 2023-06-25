@@ -159,10 +159,11 @@ def make_digits_ensemble_data(
 
     # Tokenization
     ret_dict = {
-        'input_ids': [],
+        'src_tokens': [],
+        'src_lengths': [],
         'attention_mask': [],
-        'token_type_ids': [],
-        'labels': []
+        'prev_output_tokens': [],
+        'target': []
     }
 
     for r_idx, (src_data, tgt_data) in enumerate(zip(all_src_data, all_tgt_data)):
@@ -170,8 +171,6 @@ def make_digits_ensemble_data(
         tgt_data.sent = tgt_data.sent.strip()
 
         src_data.sent = re.sub(r'[^0-9a-zA-Z가-힣\s]', '', src_data.sent)
-        if re.search(r'[^가-힣0-9\s]+', src_data.sent):
-            continue
 
         if 0 == (r_idx % 1000):
             print(f'[run_utils][make_digits_ensemble_data] {r_idx} is processing... {src_data.sent}')
@@ -193,19 +192,27 @@ def make_digits_ensemble_data(
             src_data.sent = ERR_SENT_CHANGED_FIXED[src_data.id][0]
             tgt_data.sent = ERR_SENT_CHANGED_FIXED[src_data.id][1]
 
-        tgt_tokens = [decode_vocab['[CLS]']] + [decode_vocab[x] for x in list(tgt_data.sent)] + [decode_vocab['[SEP]']]
+        if re.search(r'[^가-힣0-9\s]+', src_data.sent):
+            continue
+
+        tgt_tokens = [decode_vocab.index('[CLS]')] + [decode_vocab.index(x) for x in list(tgt_data.sent)] + [decode_vocab.index('[SEP]')]
         if max_seq_len <= len(tgt_tokens):
             tgt_tokens = tgt_tokens[:max_seq_len-1]
-            tgt_tokens.append(decode_vocab['[SEP]'])
+            tgt_tokens.append(decode_vocab.index('[SEP]'))
         else:
             diff_size = max_seq_len - len(tgt_tokens)
-            tgt_tokens += [decode_vocab['[PAD]']] * diff_size
+            tgt_tokens += [decode_vocab.index('[PAD]')] * diff_size
         assert max_seq_len == len(tgt_tokens), f'ERR - tgt_tokens.size: {len(tgt_tokens)}'
 
-        ret_dict['input_ids'].append(src_tokens['input_ids'][0])
+        cls_idx = np.where(src_tokens['input_ids'][0] == tokenizer.encode('[CLS]')[1])[0][0]
+        sep_idx = np.where(src_tokens['input_ids'][0] == tokenizer.encode('[SEP]')[1])[0][0]
+        src_lengths = len(src_tokens['input_ids'][0][cls_idx:sep_idx + 1])
+
+        ret_dict['src_tokens'].append(src_tokens['input_ids'][0])
+        ret_dict['src_lengths'].append(src_lengths)
         ret_dict['attention_mask'].append(src_tokens['attention_mask'][0])
-        ret_dict['token_type_ids'].append(src_tokens['token_type_ids'][0])
-        ret_dict['labels'].append(tgt_tokens)
+        ret_dict['prev_output_tokens'].append(src_tokens['input_ids'][0])
+        ret_dict['target'].append(tgt_tokens)
     # end loop
 
     # convert list to np
