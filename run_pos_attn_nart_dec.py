@@ -30,6 +30,7 @@ from utils.post_method import (
     make_g2p_word_dictionary, apply_our_sam_word_item,
     save_our_sam_debug, get_dict_items_info, PreDictItem, re_evaluate_apply_dict
 )
+from utils.db_utils import insert_items_to_db
 
 from definition.data_def import OurSamItem
 
@@ -365,7 +366,8 @@ def main(
     with open(our_sam_path, mode='rb') as f:
         our_sam_dict = pickle.load(f)
         our_sam_dict = make_g2p_word_dictionary(our_sam_word_items=our_sam_dict)
-    get_dict_items_info(our_sam_dict)
+    # get_dict_items_info(our_sam_dict)
+    insert_items_to_db(db_path='./db/dict.db', dict_items=our_sam_dict)
     print(f'[run_pos_attn_nart_dec][main] our_sam_dict_size: {len(our_sam_dict)}')
 
     # Build Model
