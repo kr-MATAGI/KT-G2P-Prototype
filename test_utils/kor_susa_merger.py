@@ -361,12 +361,12 @@ if '__main__' == __name__:
             b_use_custom_vocab=True,
             custom_vocab_path='../data/vocab/pron_eumjeol_vocab.json',
             npy_save_path='../data/susa_kor/npy/lstm',
-            b_use_kor_data=False
+            b_use_kor_data=True
         )
     if b_make_only_dec:
         kor_susa_merger.make_merged_kor_susa_npy_for_only_dec(
             kor_npy_dir_path='../data/kor/npy/only_dec',
             susa_dir_path='../data/digits',
             npy_save_path='../data/susa_kor/npy/only_dec',
-            b_use_kor_data=False
+            b_use_kor_data=True
         )

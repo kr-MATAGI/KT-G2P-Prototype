@@ -64,9 +64,10 @@ def apply_our_sam_word_item(
     # [[('저', ['NP']), ('를', ['JKO'])], [('부르', ['VV']), ('셨', ['EP', 'EP']), ('나요', ['EC'])]]
     # [['NP', 'JKO'], ['VV', 'EP', 'EP', 'EC']]
 
+    split_input_sent = input_sent.split(' ')
     split_pred_sent = pred_sent.split(' ')
     split_ans_sent = ans_sent.split(' ')
-    for inp_idx, inp_item in enumerate(input_sent.split(' ')):
+    for inp_idx, inp_item in enumerate(split_input_sent):
         include_flag = True
         '''
             NNG: 일반 명사
@@ -84,9 +85,7 @@ def apply_our_sam_word_item(
                 b_include_vv_va = True
                 break
 
-
-
-        if (inp_item in our_sam_g2p_dict.keys()) and \
+        if (inp_item in our_sam_g2p_dict.keys()) and len(split_input_sent) == len(split_pred_sent) and \
                 (split_pred_sent[inp_idx] not in our_sam_g2p_dict[inp_item].pronun_list):
             '''
                 복수 표준 발음 처리 (임시)
