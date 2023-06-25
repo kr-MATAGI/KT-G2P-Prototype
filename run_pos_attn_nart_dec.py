@@ -353,7 +353,6 @@ def main(
     logger.info(f'src_vocab: {len(src_vocab)}')
     logger.info(f'dec_vocab: {len(dec_vocab)}')
 
-
     ''' 우리말 샘 문자열-발음열 사전 '''
     our_sam_dict: List[DictWordItem] = []
     with open(our_sam_path, mode='rb') as f:
@@ -404,7 +403,7 @@ def main(
             model.to(config.device)
 
             evaluate(config, model, test_datasets, "test",
-                     src_vocab, src_vocab, global_step, our_sam_dict)
+                     src_vocab, ç, global_step, our_sam_dict)
 
 ### MAIN ###
 if '__main__' == __name__:

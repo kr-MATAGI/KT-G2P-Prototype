@@ -12,7 +12,7 @@ from torch.utils.data import RandomSampler, SequentialSampler, DataLoader
 from utils.kocharelectra_tokenization import KoCharElectraTokenizer
 from transformers import ElectraConfig, get_linear_schedule_with_warmup
 from model.electra_nart_pos_dec_model import ElectraNartPosDecModel
-from definition.data_def import OurSamItem
+from definition.data_def import DictWordItem
 
 import time
 from attrdict import AttrDict
@@ -23,7 +23,15 @@ import evaluate as hug_eval
 from run_utils import (
     make_digits_ensemble_data, G2P_Dataset,
     init_logger, make_inputs_from_batch,
-    make_eojeol_mecab_res
+    make_eojeol_mecab_res,
+    print_args, set_seed
+)
+from utils.post_method import (
+    make_g2p_word_dictionary, save_our_sam_debug
+)
+from utils.electra_only_dec_utils import (
+    get_vocab_type_dictionary, load_electra_transformer_decoder_npy,
+    ElectraOnlyDecDataset, make_electra_only_dec_inputs
 )
 
 ### OurSam Dict
@@ -39,7 +47,7 @@ from KorDigits import Label2Num
 ### GLOBAL
 logger = init_logger()
 numeral_model = Label2Num()
-
+tokenizer = KoCharElectraTokenizer.from_pretrained('monologg/kocharelectra-base-discriminator')
 
 #===============================================================
 def evaluate(args, model, tokenizer, eval_dataset, mode,
@@ -344,12 +352,27 @@ def main(
     else:
         args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    # Read decode vocab
-    decode_vocab: Dict[str, int] = {}
-    with open(decode_vocab_path, mode='r', encoding='utf-8') as f:
-        decode_vocab = json.load(f)
-        decode_ids2tag = {v: k for k, v in decode_vocab.items()}
-    print(f'[run_digits_ensemble][main] decode_vocab.size: {len(decode_vocab.keys())}')
+    print_args(args, logger)
+    set_seed(args.seed)
+
+
+    # Load Vocab
+    '''
+        [PAD] : 0
+        [UNK] : 1
+        [CLS] : 2
+        [SEP] : 3
+        [MASK] : 4
+    '''
+    src_vocab = get_vocab_type_dictionary(tokenizer=tokenizer, is_kochar_electra=True)
+    if args.use_custom_vocab:
+        dec_vocab = get_vocab_type_dictionary(decode_vocab_path, is_kochar_electra=False)
+    else:
+        dec_vocab = copy.deepcopy(src_vocab)
+    args.src_vocab_size = len(src_vocab)
+    args.decoder_vocab_size = len(dec_vocab)
+    logger.info(f'src_vocab: {len(src_vocab)}')
+    logger.info(f'dec_vocab: {len(dec_vocab)}')
 
     # Read post_method_dict
     ''' 초/중/종성 마다 올 수 있는 발음 자소를 가지고 있는 사전 '''
@@ -359,57 +382,38 @@ def main(
     print(f'[run_digits_ensemble][main] post_proc_dict.size: {len(post_proc_dict.keys())}')
 
     ''' 우리말 샘 문자열-발음열 사전 '''
-    our_sam_dict: None
+    our_sam_dict: List[DictWordItem] = []
     with open(our_sam_path, mode='rb') as f:
         our_sam_dict = pickle.load(f)
+        our_sam_dict = make_g2p_word_dictionary(our_sam_word_items=our_sam_dict)
     print(f'[run_digits_ensemble][main] our_sam_dict.size: {len(our_sam_dict.keys())}')
 
     # Load Model
-    tokenizer = KoCharElectraTokenizer.from_pretrained(args.model_name_or_path)
-
-    config = ElectraConfig.from_pretrained(args.model_name_or_path)
-    config.model_name_or_path = args.model_name_or_path
-    config.device = args.device
-    config.max_seq_len = args.max_seq_len
-
-    config.pad_ids = tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0]  # 0
-    config.unk_ids = tokenizer.convert_tokens_to_ids([tokenizer.unk_token])[0]  # 1
-    config.start_ids = tokenizer.convert_tokens_to_ids([tokenizer.cls_token])[0]  # 2
-    config.end_ids = tokenizer.convert_tokens_to_ids([tokenizer.sep_token])[0]  # 3
-    config.mask_ids = tokenizer.convert_tokens_to_ids([tokenizer.mask_token])[0]  # 4
-    config.gap_ids = tokenizer.convert_tokens_to_ids([' '])[0]  # 5
-
-    config.vocab_size = args.vocab_size = len(tokenizer)
-    config.out_vocab_size = args.out_vocab_size = len(decode_vocab.keys())
-    config.do_post_method = args.do_post_method
-
-    model = ElectraStdPronRules.from_pretrained(
-        args.model_name_or_path,
-        config=config, tokenizer=tokenizer, out_tag2ids=decode_vocab,
-        out_ids2tag=decode_ids2tag, jaso_pair_dict=post_proc_dict
-    )
+    model = ElectraNartPosDecModel.build_model(args=args, tokenizer=tokenizer,
+                                               src_vocab=src_vocab, dec_vocab=dec_vocab,
+                                               post_proc_dict=post_proc_dict)
     model.to(args.device)
 
     # Do Train
     if args.do_train:
         train_datasets = make_digits_ensemble_data(data_path=args.data_pkl, mode='train',
-                                                   tokenizer=tokenizer, decode_vocab=decode_vocab)
+                                                   tokenizer=tokenizer, decode_vocab=dec_vocab)
         dev_datasets = make_digits_ensemble_data(data_path=args.data_pkl, mode='dev',
-                                                 tokenizer=tokenizer, decode_vocab=decode_vocab)
+                                                 tokenizer=tokenizer, decode_vocab=dec_vocab)
         train_datasets = G2P_Dataset(item_dict=train_datasets, labels=train_datasets['labels'])
         dev_datasets = G2P_Dataset(item_dict=dev_datasets, labels=dev_datasets['labels'])
 
         global_step, tr_loss = train(args, model, tokenizer, train_datasets, dev_datasets,
-                                     decode_vocab, our_sam_dict)
+                                     dec_vocab, our_sam_dict)
         logger.info(f'global_step = {global_step}, average loss = {tr_loss}')
 
     # Do Eval
     if args.do_eval:
         test_datasets = make_digits_ensemble_data(data_path=args.data_pkl, mode='test',
-                                                  tokenizer=tokenizer, decode_vocab=decode_vocab)
+                                                  tokenizer=tokenizer, decode_vocab=dec_vocab)
         test_datasets = G2P_Dataset(item_dict=test_datasets, labels=test_datasets['labels'])
         checkpoints = list(os.path.dirname(c) for c in
-                           sorted(glob.glob(args.output_dir + "/**/" + "pytorch_model.bin", recursive=True),
+                           sorted(glob.glob(args.output_dir + "/**/" + "model.pt", recursive=True),
                                   key=lambda path_with_step: list(map(int, re.findall(r"\d+", path_with_step)))[-1]))
 
         if not args.eval_all_checkpoints:
@@ -421,34 +425,14 @@ def main(
 
         for checkpoint in checkpoints:
             global_step = checkpoint.split("-")[-1]
-            ckpt_config = ElectraConfig.from_pretrained(checkpoint)
-            ckpt_config.do_post_method = config.do_post_method
-            model = ElectraStdPronRules.from_pretrained(checkpoint, tokenizer=tokenizer, out_tag2ids=decode_vocab,
-                                                        out_ids2tag=decode_ids2tag, jaso_pair_dict=post_proc_dict,
-                                                        config=ckpt_config)
+            model = ElectraNartPosDecModel.build_model(args=args, tokenizer=tokenizer,
+                                                       src_vocab=src_vocab, dec_vocab=dec_vocab,
+                                                       post_proc_dict=post_proc_dict)
+            model.load_state_dict(torch.load(checkpoint + '/model.pt'))
             model.to(args.device)
             evaluate(args, model, tokenizer, test_datasets, mode="test",
-                     output_vocab=decode_vocab, our_sam_dict=our_sam_dict, global_steps=global_step)
-
-#============================================================
-def save_debug_txt(save_path: str, our_sam_debug_list: List[OurSamItem]):
-#============================================================
-    print(f"[run_digits_ensemble][save_debug_txt] save_path: {save_path}")
-
-    with open(save_path, mode="w", encoding="utf-8") as w_f:
-        for d_idx, debug_item in enumerate(our_sam_debug_list):
-            w_f.write(f"{str(d_idx)}\n\n")
-            w_f.write(f"입력 문장:\n{debug_item.input_sent}\n\n")
-            w_f.write(f"예측 문장:\n{debug_item.pred_sent}\n\n")
-            w_f.write(f"정답 문장:\n{debug_item.ans_sent}\n\n")
-            w_f.write(f"변경된 문장:\n{debug_item.conv_sent}\n\n")
-
-            w_f.write("=========================\n")
-            w_f.write(f"입력  예측  변경  정답\n")
-            for inp, pred, conv, ans in zip(debug_item.input_word, debug_item.pred_word,
-                                            debug_item.our_sam_word, debug_item.ans_word):
-                w_f.write(f"{inp}\t{pred}\t{conv}\t{ans}\n")
-            w_f.write("=========================\n\n")
+                     output_vocab=dec_vocab,
+                     our_sam_dict=our_sam_dict, global_steps=global_step)
 
 ### MAIN ###
 if '__main__' == __name__:
@@ -458,5 +442,5 @@ if '__main__' == __name__:
         config_path='./config/digits_ensemble_config.json',
         decode_vocab_path='./data/vocab/pron_eumjeol_vocab.json',
         jaso_post_path='./data/post_method/jaso_filter.json',
-        our_sam_path='./data/dictionary/our_sam_std_dict.pkl'
+        our_sam_path='./data/dictionary/filtered_dict_word_item.pkl'
     )
