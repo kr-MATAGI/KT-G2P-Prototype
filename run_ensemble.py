@@ -11,7 +11,7 @@ from torch.utils.data import RandomSampler, SequentialSampler, DataLoader
 
 from utils.kocharelectra_tokenization import KoCharElectraTokenizer
 from transformers import ElectraConfig, get_linear_schedule_with_warmup
-from model.electra_std_pron_rule import ElectraStdPronRules
+from model.electra_nart_pos_dec_model import ElectraNartPosDecModel
 from definition.data_def import OurSamItem
 
 import time
