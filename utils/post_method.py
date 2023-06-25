@@ -79,11 +79,17 @@ def apply_our_sam_word_item(
         b_include_vv_va = False
         for tag in pos_list[inp_idx]:
             if tag in ['NNG', 'NNP']: # 어절 안에 명사 종류가 포함되어 있는가
+                ''' 명사가 포함된경우 명사만 포함되어있는가 '''
                 b_include_nn = True
-                break
-            if tag in ['VV', 'VA']: # 어절 안에 동사, 형용사가 포함되어 있는가?
+            else:
+                b_include_nn = False
+            if tag in ['VV', 'VA'] and 0 == inp_idx: # 어절 안에 동사, 형용사가 포함되어 있는가?
+                ''' 동사, 형용사가 포함된 경우 첫 품사가 동사 or 형용사인가 '''
                 b_include_vv_va = True
                 break
+
+        if not b_include_nn and not b_include_vv_va:
+            continue
 
         if (inp_item in our_sam_g2p_dict.keys()) and len(split_input_sent) == len(split_pred_sent) and \
                 (split_pred_sent[inp_idx] not in our_sam_g2p_dict[inp_item].pronun_list):
