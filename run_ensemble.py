@@ -46,7 +46,8 @@ from KorDigits import Label2Num
 
 ### GLOBAL
 logger = init_logger()
-numeral_model = Label2Num()
+mecab = Mecab()
+numeral_model = Label2Num(mecab)
 tokenizer = KoCharElectraTokenizer.from_pretrained('monologg/kocharelectra-base-discriminator')
 
 #===============================================================
@@ -54,9 +55,6 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
 #===============================================================
     # init
     logger.info("***** Running evaluation on {} dataset *****".format(mode))
-
-    # init
-    mecab = Mecab()
 
     eval_loss = 0.0
     eval_steps = 0
