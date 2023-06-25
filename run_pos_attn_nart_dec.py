@@ -12,6 +12,7 @@ import os
 import re
 import glob
 from attrdict import AttrDict
+from typing import List, Dict
 
 from tqdm import tqdm
 from transformers import get_linear_schedule_with_warmup
@@ -305,11 +306,26 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
     wrong_df.to_csv(f"./results/electra_nart_dec/{mode}_wrong_case.csv", index=False, header=True)
 
 #==================================================================
-def main(config_path: str, custom_vocab_path: str, our_sam_path: str):
+def main(
+        config_path: str,
+        custom_vocab_path: str,
+        our_sam_path: str,
+        jaso_post_proc_path: str
+):
 #==================================================================
     logger.info(f'config_path: {config_path}')
     logger.info(f'custom_vocab_path: {custom_vocab_path}')
     logger.info(f'our_sam_path: {our_sam_path}')
+    logger.info(f'jaso_post_proc_path: {jaso_post_proc_path}')
+
+    if not os.path.exists(config_path):
+        raise Exception(f'ERR - config_path')
+    if not os.path.exists(custom_vocab_path):
+        raise Exception(f'ERR - custom_vocab_path')
+    if not os.path.exists(our_sam_path):
+        raise Exception(f'ERR - our_sam_path')
+    if not os.path.exists(jaso_post_proc_path):
+        raise Exception(f'ERR - jaso_post_proc_path')
 
     # Read Config
     config = None
@@ -320,6 +336,11 @@ def main(config_path: str, custom_vocab_path: str, our_sam_path: str):
     print_args(config, logger)
     set_seed(config.seed)
     config.output_dir = os.path.join(config.ckpt_dir, config.output_dir)
+
+    ''' 초/중/종성 마다 올 수 있는 발음 자소를 가지고 있는 사전 '''
+    post_proc_dict: Dict[str, Dict[str, List[str]]] = {}
+    with open(jaso_post_proc_path, mode="r", encoding="utf-8") as f:
+        post_proc_dict = json.load(f)
 
     # Load Vocab
     '''
@@ -348,7 +369,8 @@ def main(config_path: str, custom_vocab_path: str, our_sam_path: str):
 
     # Build Model
     model = ElectraNartPosDecModel.build_model(args=config, tokenizer=tokenizer,
-                                               src_vocab=src_vocab, dec_vocab=dec_vocab)
+                                               src_vocab=src_vocab, dec_vocab=dec_vocab,
+                                               post_proc_dict=post_proc_dict)
     model.to(config.device)
 
     # Do Train
@@ -382,7 +404,8 @@ def main(config_path: str, custom_vocab_path: str, our_sam_path: str):
         for checkpoint in checkpoints:
             global_step = checkpoint.split("-")[-1]
             model = ElectraNartPosDecModel.build_model(args=config, tokenizer=tokenizer,
-                                                       src_vocab=src_vocab, dec_vocab=dec_vocab)
+                                                       src_vocab=src_vocab, dec_vocab=dec_vocab,
+                                                       post_proc_dict=post_proc_dict)
             model.load_state_dict(torch.load(checkpoint + '/model.pt'))
             model.to(config.device)
 
@@ -395,7 +418,10 @@ if '__main__' == __name__:
     config_path = './config/nart_pos_dec_config.json'
     custom_vocab_path = './data/vocab/pron_eumjeol_vocab.json'
     our_sam_path = './data/dictionary/our_sam_std_dict.pkl'
+    jaso_post_proc_path = './data/post_method/jaso_filter.json'
 
     main(config_path=config_path,
          custom_vocab_path=custom_vocab_path,
-         our_sam_path=our_sam_path)
+         our_sam_path=our_sam_path,
+         jaso_post_proc_path=jaso_post_proc_path
+    )
