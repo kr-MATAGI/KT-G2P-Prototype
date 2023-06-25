@@ -6,7 +6,7 @@
   "dev_npy": "./data/susa_kor/npy/only_dec/dev.npy",
   "test_npy": "./data/susa_kor/npy/only_dec/test.npy",
   "evaluate_test_during_training": true,
-  "eval_all_checkpoints": true,
+  "eval_all_checkpoints": false,
   "save_optimizer": false,
   "do_lower_case": false,
   "do_train": false,
