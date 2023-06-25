@@ -5,6 +5,8 @@ from definition.data_def import DictWordItem, OurSamItem
 from dataclasses import dataclass, field
 from typing import List, Dict
 
+import evaluate as hug_eval
+
 @dataclass
 class PreDictItem:
     pronun_list: List[str] = field(default_factory=list)
@@ -201,6 +203,56 @@ def get_dict_items_info(target_dict: Dict[str, PreDictItem]):
         elif '형용사' == dict_item.pos:
             va_cnt += 1
     print(f'[post_method][get_dict_item_info] 갯수 - 총합: {total_cnt} 명사: {nn_cnt}, 동사: {vv_cnt}, 형용사: {va_cnt}')
+
+#========================================================
+def re_evaluate_apply_dict(
+        target_items: List[OurSamItem],
+        input_sent_list: List[str], pred_sent_list: List[str], ans_sent_list: List[str]):
+#========================================================
+    print(f'[post_method][re_evaluate_apply_dict] target_items.size: {len(target_items)}')
+    print(f'[post_method][re_evaluate_apply_dict] list.size - input: {len(input_sent_list)}, '
+          f'pred: {len(pred_sent_list)}, ans: {len(ans_sent_list)}')
+
+    our_sam_correct_cnt = 0
+    before_correct_cnt = 0
+    pred_sent_change_cnt = 0
+    for tgt_idx, target_items in enumerate(target_items):
+        is_change = False
+        for inp, pred, conv, ans in zip(target_items.input_word, target_items.pred_word,
+                                         target_items.our_sam_word, target_items.ans_word):
+
+            if pred == ans and conv[0] != ans:
+                is_change = True
+                before_correct_cnt += 1
+                target_items.pred_sent = target_items.pred_sent.replace(conv[0], pred)
+            elif pred != ans and ans not in conv:
+                is_change = True
+                our_sam_correct_cnt += 1
+                target_items.pred_sent = target_items.pred_sent.replace(pred, conv[0])
+                target_items.ans_sent = target_items.ans_sent.replace(ans, conv[0])
+
+        if is_change:
+            for p_idx, pred_sent in enumerate(pred_sent_list):
+                if target_items.conv_sent == pred_sent:
+                    pred_sent_list[p_idx] = target_items.pred_sent
+                    pred_sent_change_cnt += 1
+                    break
+
+    re_correct_cnt = 0
+    for pred, ans in zip(pred_sent_list, ans_sent_list):
+        if pred == ans:
+            re_correct_cnt += 1
+
+    wer_score = hug_eval.load("wer").compute(predictions=pred_sent_list, references=ans_sent_list)
+    per_score = hug_eval.load("cer").compute(predictions=pred_sent_list, references=ans_sent_list)
+    sent_acc = re_correct_cnt / len(input_sent_list)
+    print(f'[post_method][re_evaluate_apply_dict] our_sam_correct_cnt: {our_sam_correct_cnt}, '
+          f'before_correct_cnt: {before_correct_cnt}, pred_sent_change_cnt: {pred_sent_change_cnt}, '
+          f're_correct_cnt: {re_correct_cnt}')
+    print(f'[post_method][re_evaluate_apply_dict] re_wer = {wer_score * 100}')
+    print(f'[post_method][re_evaluate_apply_dict] re_per = {per_score * 100}')
+    print(f'[post_method][re_evaluate_apply_dict] re_sent.acc = {sent_acc * 100}')
+
 
 ### MAIN ###
 if '__main__' == __name__:

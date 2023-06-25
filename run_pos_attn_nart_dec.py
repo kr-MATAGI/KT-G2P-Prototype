@@ -28,7 +28,7 @@ from utils.electra_only_dec_utils import (
 )
 from utils.post_method import (
     make_g2p_word_dictionary, apply_our_sam_word_item,
-    save_our_sam_debug, get_dict_items_info, PreDictItem
+    save_our_sam_debug, get_dict_items_info, PreDictItem, re_evaluate_apply_dict
 )
 
 from definition.data_def import OurSamItem
@@ -168,7 +168,7 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
     candidates = []
     total_correct = 0
 
-    change_cnt = 0
+    input_sent_list = []
 
     wrong_case = {
         "input_sent": [],
@@ -256,6 +256,8 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
                 wrong_case["input_sent"].append(input_sent)
                 wrong_case["pred_sent"].append(pred_sent)
                 wrong_case["ans_sent"].append(ans_sent)
+
+            input_sent_list.append(input_sent)
     # end loop, decode
 
     wer_score = hug_eval.load("wer").compute(predictions=candidates, references=references)
@@ -297,6 +299,11 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
                            wrong_item_save_path='./results/electra_nart_dec/our_sam_wrong.txt',
                            our_sam_debug_list=all_our_sam_debug_info)
         print(f'[run_electra_enc_dec][evaluate] OurSamDebug info Save Complete !')
+
+    if args.use_our_sam:
+        re_evaluate_apply_dict(target_items=all_our_sam_debug_info,
+                               input_sent_list=input_sent_list,
+                               pred_sent_list=candidates, ans_sent_list=references)
 
 #==================================================================
 def main(
