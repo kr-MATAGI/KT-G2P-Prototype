@@ -4,6 +4,7 @@
 *.zip
 *.xml
 *.json
+*.db
 
 # IDE
 .DS_Stroe

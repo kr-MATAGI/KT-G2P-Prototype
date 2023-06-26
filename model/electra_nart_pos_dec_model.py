@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from model.nonauto_nmt.pos_nart_decoder import Decoder
 from transformers import ElectraModel
@@ -81,6 +82,7 @@ class ElectraNartPosDecModel(nn.Module):
         if self.args.do_post_method and 'eval' == kwargs['mode']:
             batch_size, seq_len = src_tokens.size()
 
+            decoder_out = F.softmax(decoder_out, dim=-1)
             decoded_batch_eumjeol_sent = self._decode_batch_sentences(src_tokens)
             for t in range(seq_len):
                 mutable_pron_list = self._get_mutable_pron_list(time_step=t, batch_size=batch_size,
@@ -89,8 +91,10 @@ class ElectraNartPosDecModel(nn.Module):
                 mutable_pron_ids = self._get_score_handling_list(batch_size=batch_size,
                                                                  out_vocab_size=len(self.dec_vocab),
                                                                  mutable_pron_list=mutable_pron_list)
-                for b in range(batch_size):
-                    decoder_out[b, t] *= mutable_pron_ids[b]
+                decoder_out[:, t] *= mutable_pron_ids
+
+                # for b in range(batch_size):
+                #     decoder_out[b, t] *= mutable_pron_ids[b]
 
         return decoder_out
 

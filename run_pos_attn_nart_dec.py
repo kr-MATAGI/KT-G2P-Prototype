@@ -30,6 +30,7 @@ from utils.post_method import (
     make_g2p_word_dictionary, apply_our_sam_word_item,
     save_our_sam_debug, get_dict_items_info, PreDictItem, re_evaluate_apply_dict
 )
+from utils.db_utils import insert_items_to_db
 
 from definition.data_def import OurSamItem
 
@@ -94,7 +95,7 @@ def train(args, model, train_datasets, dev_datasets, src_vocab, dec_vocab, our_s
     global_step = 0
     tr_loss = 0.0
 
-    criterion = nn.NLLLoss()
+    criterion = nn.CrossEntropyLoss()
     train_sampler = RandomSampler(train_datasets)
 
     model.zero_grad()
@@ -109,7 +110,7 @@ def train(args, model, train_datasets, dev_datasets, src_vocab, dec_vocab, our_s
             inputs["mode"] = "train"
 
             output = model(**inputs)
-            output = F.log_softmax(output, -1)
+            # output = F.log_softmax(output, -1)
 
             loss = criterion(output.reshape(-1, len(dec_vocab)), batch["tgt_tokens"].view(-1).to(args.device))
             loss.backward()
@@ -184,7 +185,7 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
     all_our_sam_debug_info: List[OurSamItem] = []
     total_change_cnt = 0
 
-    criterion = nn.NLLLoss()
+    criterion = nn.CrossEntropyLoss()
     eval_sampler = SequentialSampler(eval_datasets)
     eval_dataloader = DataLoader(eval_datasets, sampler=eval_sampler, batch_size=args.eval_batch_size)
     eval_pbar = tqdm(eval_dataloader)
@@ -206,7 +207,7 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
             torch.cuda.synchronize()
             cuda_times.append(cuda_starter.elapsed_time(cuda_ender) / 1000)
 
-            output = F.log_softmax(output, -1)
+            # output = F.log_softmax(output, -1)
             loss = criterion(output.reshape(-1, len(dec_vocab)), batch["tgt_tokens"].view(-1).to(args.device))
 
             eval_loss += loss.mean().item()
@@ -303,7 +304,8 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
     if args.use_our_sam:
         re_evaluate_apply_dict(target_items=all_our_sam_debug_info,
                                input_sent_list=input_sent_list,
-                               pred_sent_list=candidates, ans_sent_list=references)
+                               pred_sent_list=candidates,
+                               ans_sent_list=references)
 
 #==================================================================
 def main(
@@ -366,6 +368,7 @@ def main(
         our_sam_dict = pickle.load(f)
         our_sam_dict = make_g2p_word_dictionary(our_sam_word_items=our_sam_dict)
     get_dict_items_info(our_sam_dict)
+    # insert_items_to_db(db_path='./db/dict.db', dict_items=our_sam_dict)
     print(f'[run_pos_attn_nart_dec][main] our_sam_dict_size: {len(our_sam_dict)}')
 
     # Build Model

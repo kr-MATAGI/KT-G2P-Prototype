@@ -500,6 +500,35 @@ class OurSamMakerByJson:
 
         return json_format
 
+    def get_word_type_cnt_info(
+            self,
+            target_dict: List[DictWordItem],
+            target_word_type: str
+    ):
+        print(f'[OurSamMakerByJson][get_word_type_cnt_info] target_dict.size: {len(target_dict)}, '
+              f'target_word_type: {target_word_type}')
+
+        ret_cnt = 0
+        for idx, dict_item in enumerate(target_dict):
+            if target_word_type == dict_item.word_type:
+                ret_cnt += 1
+        print(f'[OurSamMakerByJson][get_word_type_cnt_info] target_lang_type: {target_word_type}, count: {ret_cnt}')
+
+        return ret_cnt
+
+    def get_conju_items_count(
+            self,
+            target_dict: List[DictWordItem],
+    ):
+        print(f'[OurSamMakerByJson][get_conju_items_count] target_dict.size: {len(target_dict)}')
+
+        ret_cnt = 0
+        for idx, dict_items in enumerate(target_dict):
+            ret_cnt += len(dict_items.conju_list)
+        print(f'[OurSamMakerByJson][get_conju_items_count] conju_list.size: {ret_cnt}')
+
+        return ret_cnt
+
 ### MAIN ###
 if "__main__" == __name__:
     print("[dict_maker] __main__")
@@ -547,7 +576,7 @@ if "__main__" == __name__:
 
         raw_word_item_pkl_path = '../data/dictionary/raw_dict_word_item.pkl'
         filtered_word_item_pkl_path = '../data/dictionary/filtered_dict_word_item.pkl'
-        b_make_raw_word_item_list = True
+        b_make_raw_word_item_list = False
 
         if b_make_raw_word_item_list:
             word_item_list = dict_maker_json_ver.make_dict_word_item_list(raw_json_dir_path='../data/our_sam')
@@ -585,3 +614,9 @@ if "__main__" == __name__:
             eng_save_json = dict_maker_json_ver.make_lang_item_info_json(target_dict=eng_dict, lang='eng')
             json.dump(eng_save_json, e_f, indent=4, ensure_ascii=False)
             print(f'[our_Sam_maker][__main__] Save Complete ! - Eng Dict')
+
+        dict_maker_json_ver.get_word_type_cnt_info(target_dict=list(dict_word_item_list), target_word_type='고유어')
+        dict_maker_json_ver.get_word_type_cnt_info(target_dict=list(dict_word_item_list), target_word_type='한자어')
+        dict_maker_json_ver.get_word_type_cnt_info(target_dict=list(dict_word_item_list), target_word_type='외래어')
+
+        dict_maker_json_ver.get_conju_items_count(target_dict=list(dict_word_item_list))

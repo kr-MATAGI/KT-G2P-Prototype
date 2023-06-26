@@ -15,7 +15,7 @@ from model.electra_std_pron_rule import ElectraStdPronRules
 from definition.data_def import DictWordItem, OurSamItem
 from utils.post_method import (
     apply_our_sam_word_item, make_g2p_word_dictionary,
-    save_our_sam_debug
+    save_our_sam_debug, re_evaluate_apply_dict
 )
 
 import time
@@ -26,8 +26,7 @@ import evaluate as hug_eval
 
 from run_utils import (
     load_npy_file, G2P_Dataset,
-    init_logger, make_inputs_from_batch,
-    make_eojeol_mecab_res
+    init_logger, make_inputs_from_batch
 )
 
 import platform
@@ -61,6 +60,8 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
     references = []
     candidates = []
     total_correct = 0
+
+    input_sent_list = []
 
     wrong_case = {
         "input_sent": [],
@@ -124,23 +125,32 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
             ''' 우리말 샘 문자열-발음열 대치 '''
             ''' debug '''
             if args.use_our_sam:
-                our_sam_res, is_change = apply_our_sam_word_item(our_sam_g2p_dict=our_sam_dict, mecab=mecab,
-                                                                 input_sent=input_sent, pred_sent=pred_sent, ans_sent=ans_sent)
+                our_sam_res, is_change = apply_our_sam_word_item(our_sam_g2p_dict=our_sam_dict,
+                                                                 mecab=mecab,
+                                                                 input_sent=input_sent,
+                                                                 pred_sent=pred_sent,
+                                                                 ans_sent=ans_sent)
                 if is_change:
                     pred_sent = our_sam_res.conv_sent
                     total_change_cnt += 1
                     all_our_sam_debug_info.append(our_sam_res)
 
-            print(f"{p_idx}:\nraw: \n{input_sent}\ncandi: \n{pred_sent}\nref: \n{ans_sent}")
+            print(f"{p_idx}:\n"
+                  f"input_sent: \n{input_sent}\n"
+                  f"pred_sent: \n{pred_sent}\n"
+                  f"ans_sent: \n{ans_sent}\n")
 
             references.append(ans_sent)
             candidates.append(pred_sent)
+
             if ans_sent == pred_sent:
                 total_correct += 1
             else:
                 wrong_case["input_sent"].append(input_sent)
                 wrong_case["pred_sent"].append(pred_sent)
                 wrong_case["ans_sent"].append(ans_sent)
+
+            input_sent_list.append(input_sent)
 
     wer_score = hug_eval.load("wer").compute(predictions=candidates, references=references)
     per_score = hug_eval.load("cer").compute(predictions=candidates, references=references)
@@ -189,6 +199,12 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
                            wrong_item_save_path='./results/bilstm_lstm/our_sam_wrong.txt',
                            our_sam_debug_list=all_our_sam_debug_info)
         print(f'[run_electra_enc_dec][evaluate] OurSamDebug info Save Complete !')
+
+    if args.use_our_sam:
+        re_evaluate_apply_dict(target_items=all_our_sam_debug_info,
+                               input_sent_list=input_sent_list,
+                               pred_sent_list=candidates,
+                               ans_sent_list=references)
 
 #========================================
 def train(args, model, tokenizer, train_dataset, dev_dataset,

@@ -112,7 +112,7 @@ class ElectraStdPronRules(ElectraPreTrainedModel):
                 '''
                     현재 시점에서 적용할 수 있는 발음열(음절)을 가져온다
                     mutable_pron_list : [batch, mutable_list_ids_size]
-                    mutable_pron_ids : [batch, out_vocab_size] 
+                    mutable_pron_ids : [batch, out_vocab_size]
                 '''
                 mutable_pron_list = self._get_mutable_pron_list(t, batch_size, decoded_batch_eumjeol_sent)
                 mutable_pron_ids = self._get_score_handling_list(batch_size,
