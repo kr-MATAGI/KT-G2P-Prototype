@@ -367,8 +367,13 @@ def main(
     with open(our_sam_path, mode='rb') as f:
         our_sam_dict = pickle.load(f)
         our_sam_dict = make_g2p_word_dictionary(our_sam_word_items=our_sam_dict)
+<<<<<<< HEAD
     get_dict_items_info(our_sam_dict)
     # insert_items_to_db(db_path='./db/dict.db', dict_items=our_sam_dict)
+=======
+    # get_dict_items_info(our_sam_dict)
+    insert_items_to_db(db_path='./db/dict.db', dict_items=our_sam_dict)
+>>>>>>> ca717a8b9243084d1d06c5d36a3cf83684799cae
     print(f'[run_pos_attn_nart_dec][main] our_sam_dict_size: {len(our_sam_dict)}')
 
     # Build Model
