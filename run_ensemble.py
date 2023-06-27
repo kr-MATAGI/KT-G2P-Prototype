@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from torch.utils.data import RandomSampler, SequentialSampler, DataLoader
 
 from utils.kocharelectra_tokenization import KoCharElectraTokenizer
-from transformers import ElectraConfig, get_linear_schedule_with_warmup
+from transformers import get_linear_schedule_with_warmup
 from model.electra_nart_pos_dec_model import ElectraNartPosDecModel
 from definition.data_def import OurSamItem
 
@@ -30,7 +30,7 @@ from utils.post_method import (
     make_g2p_word_dictionary, save_our_sam_debug, apply_our_sam_word_item
 )
 from utils.electra_only_dec_utils import (
-    get_vocab_type_dictionary, load_electra_transformer_decoder_npy,
+    get_vocab_type_dictionary,
     ElectraOnlyDecDataset, make_electra_only_dec_inputs
 )
 
@@ -51,7 +51,10 @@ numeral_model = Label2Num(mecab)
 tokenizer = KoCharElectraTokenizer.from_pretrained('monologg/kocharelectra-base-discriminator')
 
 #===============================================================
-def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step, our_sam_vocab):
+def evaluate(
+        args, model, eval_datasets, mode,
+        src_vocab, dec_vocab, global_step, our_sam_vocab
+):
 #===============================================================
     # init
     logger.info("***** Running evaluation on {} dataset *****".format(mode))
@@ -192,7 +195,10 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
         print(f'[run_ensemble][evaluate] OurSamDebug info Save Complete !')
 
 #===============================================================
-def train(args, model, train_datasets, dev_datasets, src_vocab, dec_vocab, our_sam_vocab):
+def train(
+        args, model, train_datasets, dev_datasets,
+        src_vocab, dec_vocab, our_sam_vocab
+):
 #===============================================================
     train_data_size = len(train_datasets)
 
