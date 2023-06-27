@@ -95,7 +95,7 @@ def train(args, model, train_datasets, dev_datasets, src_vocab, dec_vocab, our_s
     global_step = 0
     tr_loss = 0.0
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.NLLLoss()
     train_sampler = RandomSampler(train_datasets)
 
     model.zero_grad()
@@ -110,7 +110,7 @@ def train(args, model, train_datasets, dev_datasets, src_vocab, dec_vocab, our_s
             inputs["mode"] = "train"
 
             output = model(**inputs)
-            # output = F.log_softmax(output, -1)
+            output = F.log_softmax(output, -1)
 
             loss = criterion(output.reshape(-1, len(dec_vocab)), batch["tgt_tokens"].view(-1).to(args.device))
             loss.backward()
@@ -185,7 +185,7 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
     all_our_sam_debug_info: List[OurSamItem] = []
     total_change_cnt = 0
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.NLLLoss()
     eval_sampler = SequentialSampler(eval_datasets)
     eval_dataloader = DataLoader(eval_datasets, sampler=eval_sampler, batch_size=args.eval_batch_size)
     eval_pbar = tqdm(eval_dataloader)
@@ -207,7 +207,7 @@ def evaluate(args, model, eval_datasets, mode, src_vocab, dec_vocab, global_step
             torch.cuda.synchronize()
             cuda_times.append(cuda_starter.elapsed_time(cuda_ender) / 1000)
 
-            # output = F.log_softmax(output, -1)
+            output = F.log_softmax(output, -1)
             loss = criterion(output.reshape(-1, len(dec_vocab)), batch["tgt_tokens"].view(-1).to(args.device))
 
             eval_loss += loss.mean().item()
@@ -367,13 +367,8 @@ def main(
     with open(our_sam_path, mode='rb') as f:
         our_sam_dict = pickle.load(f)
         our_sam_dict = make_g2p_word_dictionary(our_sam_word_items=our_sam_dict)
-<<<<<<< HEAD
     get_dict_items_info(our_sam_dict)
     # insert_items_to_db(db_path='./db/dict.db', dict_items=our_sam_dict)
-=======
-    # get_dict_items_info(our_sam_dict)
-    insert_items_to_db(db_path='./db/dict.db', dict_items=our_sam_dict)
->>>>>>> ca717a8b9243084d1d06c5d36a3cf83684799cae
     print(f'[run_pos_attn_nart_dec][main] our_sam_dict_size: {len(our_sam_dict)}')
 
     # Build Model

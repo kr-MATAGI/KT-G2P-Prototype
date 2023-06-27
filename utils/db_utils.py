@@ -26,11 +26,7 @@ def insert_items_to_db(db_path: str, dict_items: Dict[str, PreDictItem]):
 
     insert_data_list = []
     for idx, (key, dict_item) in enumerate(dict_items.items()):
-<<<<<<< HEAD
         if 0 == (idx % 50000):
-=======
-        if 0 == (idx % 1000):
->>>>>>> ca717a8b9243084d1d06c5d36a3cf83684799cae
             print(f'[db_utils][insert_items_to_db] {idx} is processing... {key}')
 
         concat_pronun_list = ','.join(dict_item.pronun_list)
