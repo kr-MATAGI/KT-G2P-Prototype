@@ -45,6 +45,6 @@ def insert_items_to_db(db_path: str, dict_items: Dict[str, PreDictItem]):
 
 ### MAIN ###
 if '__main__' == __name__:
-    print('[db_utils][__main__]')
+    print('[db_utils][__main__] MAIN')
 
     create_db(db_path=DB_PATH)
