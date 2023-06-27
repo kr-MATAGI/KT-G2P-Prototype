@@ -1,8 +1,7 @@
 import sqlite3
-import os
 from db.sql_query import *
 from utils.post_method import PreDictItem
-from typing import List, Dict
+from typing import Dict
 
 DB_PATH = '../db/dict.db'
 
