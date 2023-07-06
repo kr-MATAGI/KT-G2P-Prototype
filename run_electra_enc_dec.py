@@ -1,4 +1,5 @@
 import os
+
 import json
 import re
 import glob
@@ -38,6 +39,7 @@ else:
 
 ### GLOBAL
 logger = init_logger()
+
 
 
 #========================================
@@ -205,7 +207,6 @@ def evaluate(args, model, tokenizer, eval_dataset, mode,
                                input_sent_list=input_sent_list,
                                pred_sent_list=candidates,
                                ans_sent_list=references)
-
 #========================================
 def train(args, model, tokenizer, train_dataset, dev_dataset,
           output_vocab: Dict[str, int], our_sam_dict: Dict[str, str]):
@@ -285,6 +286,7 @@ def train(args, model, tokenizer, train_dataset, dev_dataset,
                     output_dir = os.path.join(args.output_dir, "checkpoint-{}".format(global_step))
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
+
                     model_to_save = (
                         model.module if hasattr(model, "module") else model
                     )
@@ -303,9 +305,9 @@ def train(args, model, tokenizer, train_dataset, dev_dataset,
                     evaluate(args, model, tokenizer, dev_dataset, "dev",
                              output_vocab, our_sam_dict, global_steps=global_step)
 
+
         logger.info("  Epoch Done= %d", epoch + 1)
         pbar.close()
-
     return global_step, tr_loss / global_step
 
 #========================================

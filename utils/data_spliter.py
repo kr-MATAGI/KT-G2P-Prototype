@@ -73,8 +73,8 @@ if '__main__' == __name__:
     data_spliter = DataSpliter()
 
     data_spliter.make_split_data(
-        src_data_path='../data/tts_script_85ks_ms949_200407.pkl',
-        tgt_data_path='../data/tts_script_85ks_ms949_200506_g2p.pkl',
+        src_data_path='../data/kor/pkl/kor_source_filter.pkl',
+        tgt_data_path='../data/kor/pkl/kor_target.pkl',
         save_root_path='../data/raw_split'
     )
 

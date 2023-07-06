@@ -113,18 +113,22 @@ class LstmEncDecNpyMaker:
                 g2p_data.sent = ERR_SENT_CHANGED_FIXED[g2p_data.id][1]
 
             if not re.match(r"[가-힣]+", raw_data.sent):
-                except_output_pron_list.append((raw_data.id, raw_data.sent, g2p_data.sent))
+                except_output_pron_list.append((raw_data.id, raw_data.sent, g2p_data.sent, "[가힣]"))
                 continue
             if re.search(r"[ㄱ-ㅎ]+", raw_data.sent) or re.search(r'[ㅏ-ㅣ]+', raw_data.sent):
-                except_output_pron_list.append((raw_data.id, raw_data.sent, g2p_data.sent))
+                except_output_pron_list.append((raw_data.id, raw_data.sent, g2p_data.sent, "[ㄱㅎ]"))
                 continue
 
             if raw_data.id != g2p_data.id:
                 raise Exception(f"ERR - ID diff, raw_data: {raw_data.id}, g2p_data: {g2p_data.id}")
 
+            # 끝에 점 제거
+            if raw_data.sent.endswith("."):
+                raw_data.sent = raw_data.sent[:-1]
+
             # 2023.03.23에 추가 (반사,라고 -> 반사라고, 모델예측: 반사라고 답: 반사 라고)
             if len(raw_data.sent) != len(g2p_data.sent):
-                except_output_pron_list.append((raw_data.id, raw_data.sent, g2p_data.sent))
+                except_output_pron_list.append((raw_data.id, raw_data.sent, g2p_data.sent, len(raw_data.sent), len(g2p_data.sent)))
                 continue
 
             if 0 == (root_idx % 1000):
@@ -191,7 +195,7 @@ class LstmEncDecNpyMaker:
         print("[LstmEncDecNpyMaker][make_kt_tts_npy] (음절) 발음열 사전 사용시 오류가 발생한 문장")
         for e_idx, except_item in enumerate(except_output_pron_list):
             print(e_idx, except_item)
-
+            # pass
         print(f"[LstmEncDecNpyMaker][make_kt_tts_npy] sent_max_len: {sent_max_len}, "
               f"mean_sent_len: {total_sent_len/len(raw_data_list)}")
 
@@ -314,7 +318,7 @@ class LstmEncDecNpyMaker:
 if "__main__" == __name__:
     lstm_npy_maker = LstmEncDecNpyMaker(b_use_out_vocab=True, b_debug_mode=False)
 
-    lstm_npy_maker. make_bilstm_lstm_npy(raw_path="../data/kor/pkl/kor_source_filter.pkl",
+    lstm_npy_maker.make_bilstm_lstm_npy(raw_path="../data/kor/pkl/kor_source_filter.pkl",
                                         g2p_path="../data/kor/pkl/kor_target.pkl",
                                         save_path="../data/kor/npy/lstm",
                                         out_vocab_path="../data/vocab/pron_eumjeol_vocab.json")
