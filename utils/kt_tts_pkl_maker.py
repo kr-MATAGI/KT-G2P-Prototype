@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import copy
 import pickle
 
 from definition.data_def import KT_TTS
@@ -21,12 +22,13 @@ class KT_TTS_Maker():
             Text 파일을 읽어서 KT_TTS로 만든다.
             Save path가 있다면 파일까지 *.pkl로 저장
         '''
+        ''' 함수 테스트 필요! '''
         print(f'[KT_TTS_Maker][get_kt_tts_items] src_path: {raw_src_path}\ntgt_path: {raw_tgt_path}')
 
         if not os.path.exists(raw_src_path):
-            raise Exception
+            raise Exception('[KT_TTS_Maker][get_kt_tts_items] Plz Check - raw_src_path')
         if not os.path.exists(raw_tgt_path):
-            raise Exception
+            raise Exception('[KT_TTS_Maker][get_kt_tts_items] Plz Check - raw_tgt_path')
 
         ret_src_items: List[KT_TTS] = []
         ret_tgt_items: List[KT_TTS] = []
@@ -40,7 +42,37 @@ class KT_TTS_Maker():
         assert len(src_lines) == len(tgt_lines), 'ERR - src_line.size != tgt_lines.size'
 
         # insert items to list
-        # for r_idx, (src_line, tgt_line) 작업 중...
+        err_cnt = 0
+        for r_idx, (s_line, t_line) in enumerate(zip(src_lines, tgt_lines)):
+            s_id = s_line[0]
+            s_sent = s_line[1]
+
+            t_id = t_line[0]
+            t_sent = t_line[1]
+
+            if s_id != t_id:
+                err_cnt += 1
+                print(f'[KT_TTS_Maker][get_kt_tts_items] ERR ! - s_id: {s_id}, t_id: {t_id}')
+                continue
+
+            if 0 == (r_idx % 5000):
+                print(f'[KT_TTS_Maker][get_kt_tts_items] {r_idx} is processing... {s_sent}')
+
+            ret_src_items.append(copy.deepcopy(KT_TTS(id=s_id, sent=s_sent)))
+            ret_tgt_items.append(copy.deepcopy(KT_TTS(id=t_id, sent=t_sent)))
+        # end loop
+
+        print(f'[KT_TTS_Maker][get_kt_tts_items] ret_src_items.size: {len(ret_src_items)}')
+        print(f'[KT_TTS_Maker][get_kt_tts_items] ret_tgt_items.size: {len(ret_tgt_items)}')
+        assert len(ret_src_items) == len(ret_tgt_items), 'ERR - ret_items.size is diff !'
+
+        if 0 < len(save_path) and os.path.exists(save_path):
+            ''' 저장 '''
+            with open(save_path+'/kt_tts_src_items.pkl', mode='wb') as s_pf:
+                pickle.dump(ret_src_items, s_pf)
+            with open(save_path+'/kt_tts_tgt_items.pkl', mode='wb') as t_pf:
+                pickle.dump(ret_tgt_items, t_pf)
+            print(f'[KT_TTS_Maker][get_kt_tts_items] SAVE ! - src/tgt items, path: {save_path}')
 
         return ret_src_items, ret_tgt_items
 
@@ -226,9 +258,9 @@ class KT_TTS_Maker():
 if '__main__' == __name__:
     print(f'[kt_tts_pkl_maker][__main__] MAIN !')
 
-    pkl_maker = KT_TTS_Maker()
-    b_txt2pkl = False
-    b_symbol_rules = True
+    tts_maker = KT_TTS_Maker()
+    b_txt2pkl = True
+    b_symbol_rules = False
 
     '''
         *.txt -> *.pkl 변환 
@@ -236,8 +268,9 @@ if '__main__' == __name__:
     if b_txt2pkl:
         src_path = '../data/kt_tts/tts_script_85ks_ms949_200407.txt'
         tgt_path = '../data/kt_tts/tts_script_85ks_ms949_200506_g2p.txt'
-        tts_src_items, tts_tgt_items = pkl_maker.get_kt_tts_items(
-            raw_src_path=src_path, raw_tgt_path=tgt_path
+        pkl_path = '../data/kt_tts/pkl/'
+        tts_src_items, tts_tgt_items = tts_maker.get_kt_tts_items(
+            raw_src_path=src_path, raw_tgt_path=tgt_path, save_path=pkl_path
         )
 
     '''
@@ -247,9 +280,9 @@ if '__main__' == __name__:
     if b_symbol_rules:
         src = KT_TTS(id='0', sent="abc_def")
         tgt = KT_TTS(id='0', sent="십이 더하기 칠 은 십구")
-        sources : List[KT_TTS] = []
-        targets : List[KT_TTS] = []
+        sources: List[KT_TTS] = []
+        targets: List[KT_TTS] = []
         sources.append(src)
         targets.append(tgt)
-        new_sources = pkl_maker.get_converted_symbol_items(sources)
+        new_sources = tts_maker.get_converted_symbol_items(sources)
         print(new_sources)
