@@ -309,10 +309,10 @@ def main(
         jaso_post_path: str, our_sam_path: str
 ):
 #===============================================================
-    print(f'[run_digits_ensemble][main] config_path: {config_path}')
-    print(f'[run_digits_ensemble][main] decode_vocab_path: {decode_vocab_path}')
-    print(f'[run_digits_ensemble][main] jso_post_path: {jaso_post_path}')
-    print(f'[run_digits_ensemble][main] our_sam_path: {our_sam_path}')
+    print(f'[run_ensemble][main] config_path: {config_path}')
+    print(f'[run_ensemble][main] decode_vocab_path: {decode_vocab_path}')
+    print(f'[run_ensemble][main] jso_post_path: {jaso_post_path}')
+    print(f'[run_ensemble][main] our_sam_path: {our_sam_path}')
 
     if not os.path.exists(config_path):
         raise Exception(f'ERR - config_path: {config_path}')
@@ -329,7 +329,7 @@ def main(
     args.output_dir = os.path.join(args.ckpt_dir, args.output_dir)
 
     if 0 < len(args.device) and ('cuda' == args.device or 'cpu' == args.device):
-        print(f'[run_digits_ensemble][main] Config.Device: {args.device}')
+        print(f'[run_ensemble][main] Config.Device: {args.device}')
     else:
         args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -376,9 +376,9 @@ def main(
 
     # Do Train
     if args.do_train:
-        train_datasets = make_digits_ensemble_data(data_path=args.data_pkl, mode='train',
+        train_datasets = make_digits_ensemble_data(data_path=args.data_pkl, mode='train', num2kor=numeral_model,
                                                    tokenizer=tokenizer, decode_vocab=dec_vocab)
-        dev_datasets = make_digits_ensemble_data(data_path=args.data_pkl, mode='dev',
+        dev_datasets = make_digits_ensemble_data(data_path=args.data_pkl, mode='dev', num2kor=numeral_model,
                                                  tokenizer=tokenizer, decode_vocab=dec_vocab)
         train_datasets = ElectraOnlyDecDataset(item_dict=train_datasets)
         dev_datasets = ElectraOnlyDecDataset(item_dict=dev_datasets)
@@ -390,7 +390,7 @@ def main(
 
     # Do Eval
     if args.do_eval:
-        test_datasets = make_digits_ensemble_data(data_path=args.data_pkl, mode='test',
+        test_datasets = make_digits_ensemble_data(data_path=args.data_pkl, mode='test', num2kor=numeral_model,
                                                   tokenizer=tokenizer, decode_vocab=dec_vocab)
         test_datasets = ElectraOnlyDecDataset(item_dict=test_datasets)
         checkpoints = list(os.path.dirname(c) for c in

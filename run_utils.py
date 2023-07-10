@@ -130,7 +130,7 @@ def make_eojeol_mecab_res(input_sent: str, mecab_res: List):
 
 #==================================================
 def make_digits_ensemble_data(
-        data_path: str, mode: str,
+        data_path: str, mode: str, num2kor,
         tokenizer, decode_vocab, max_seq_len: int=256
 ):
 #==================================================
@@ -170,14 +170,14 @@ def make_digits_ensemble_data(
         src_data.sent = src_data.sent.strip()
         tgt_data.sent = tgt_data.sent.strip()
 
-        src_data.sent = re.sub(r'[^0-9a-zA-Z가-힣\s]', '', src_data.sent)
+        ''' Convert num2kor '''
+        src_data.sent = num2kor.generate(src_data.sent)
 
         if 0 == (r_idx % 1000):
             print(f'[run_utils][make_digits_ensemble_data] {r_idx} is processing... {src_data.sent}')
 
         src_tokens = tokenizer(src_data.sent, padding='max_length', max_length=max_seq_len,
                                return_tensors='np', truncation=True)
-
         if tgt_data.id in ERR_SENT_ID_FIXED.keys():
             print(f'[run_utils][make_digits_ensemble_data] ERR DETECTED -> {tgt_data.id}, {tgt_data.sent}')
             print(f'[run_utils][make_digits_ensemble_data] {ERR_SENT_ID_FIXED[tgt_data.id]}')
@@ -192,10 +192,11 @@ def make_digits_ensemble_data(
             src_data.sent = ERR_SENT_CHANGED_FIXED[src_data.id][0]
             tgt_data.sent = ERR_SENT_CHANGED_FIXED[src_data.id][1]
 
-        if re.search(r'[^가-힣0-9\s]+', src_data.sent):
+        if re.search(r'[^가-힣\s]+', src_data.sent):
             continue
 
-        tgt_tokens = [decode_vocab.index('[CLS]')] + [decode_vocab.index(x) for x in list(tgt_data.sent)] + [decode_vocab.index('[SEP]')]
+        tgt_tokens = [decode_vocab.index('[CLS]')] + [decode_vocab.index(x) for x in list(tgt_data.sent)] \
+                     + [decode_vocab.index('[SEP]')]
         if max_seq_len <= len(tgt_tokens):
             tgt_tokens = tgt_tokens[:max_seq_len-1]
             tgt_tokens.append(decode_vocab.index('[SEP]'))
