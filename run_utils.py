@@ -2,7 +2,6 @@ import os
 import re
 import torch
 from torch.utils.data import Dataset
-import numpy as np
 
 import pickle
 import logging
