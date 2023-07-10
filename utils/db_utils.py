@@ -16,8 +16,8 @@ class DB_Maker(metaclass=ABCMeta):
             db_path: str, table_name: str
     ):
         if not os.path.exists(db_path):
-            pass
-        print(f'{__class__} Set DB path: {db_path}')
+            raise Exception(f'[DB_Maker] ERR - DB_Path: {db_path}')
+        print(f'[DB_Maker]{table_name} Set DB path: {db_path}')
         self.db_path = db_path
 
     def create_db(
@@ -46,6 +46,10 @@ class HeadWord_DB_Maker(DB_Maker):
             self,
             db_path: str, table_name: str
     ):
+        '''
+            표제어 기분석 사전
+            적용순위 : 3
+        '''
         super(HeadWord_DB_Maker, self).__init__(db_path)
 
 #============================================
@@ -55,6 +59,10 @@ class ConjuWord_DB_Maker(DB_Maker):
             self,
             db_path: str, table_name: str
     ):
+        '''
+            활용어 기분석 사전
+            적용순위 : 2
+        '''
         super(ConjuWord_DB_Maker, self).__init__(db_path=db_path, table_name=table_name)
 
     def create_table(self):
@@ -73,6 +81,10 @@ class NNPWord_DB_Maker(DB_Maker):
             self,
             db_path: str, table_name: str
     ):
+        '''
+            고유어 기분석 사전
+            적용순위 : 1
+        '''
         super(NNPWord_DB_Maker, self).__init__(db_path=db_path, table_name=table_name)
 
     def create_table(self):
