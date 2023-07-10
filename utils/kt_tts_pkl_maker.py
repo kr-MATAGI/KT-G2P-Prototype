@@ -7,6 +7,7 @@ import pickle
 from definition.data_def import KT_TTS
 from typing import List
 
+
 #==========================================
 class KT_TTS_Maker():
 #==========================================
@@ -259,8 +260,9 @@ if '__main__' == __name__:
     print(f'[kt_tts_pkl_maker][__main__] MAIN !')
 
     tts_maker = KT_TTS_Maker()
-    b_txt2pkl = True
+    b_txt2pkl = False
     b_symbol_rules = False
+    b_symbol_rules_per_sent = False
 
     '''
         *.txt -> *.pkl 변환 
@@ -275,6 +277,7 @@ if '__main__' == __name__:
 
     '''
         특수문자 변환
+        단위: List[KT_TTS]
         기준: KT 특수문자 처리.xlsx
     '''
     if b_symbol_rules:
@@ -286,3 +289,11 @@ if '__main__' == __name__:
         targets.append(tgt)
         new_sources = tts_maker.get_converted_symbol_items(sources)
         print(new_sources)
+
+    '''
+        특수문자 변환
+        단위: str (1 문장씩)
+        기준: KT 특수문자 처리.xlsx
+    '''
+    if b_symbol_rules_per_sent:
+        ''' 여기서 테스트 :D '''
