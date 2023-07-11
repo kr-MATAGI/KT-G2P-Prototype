@@ -5,6 +5,7 @@ import copy
 import pickle
 
 from definition.data_def import KT_TTS
+from definition import special_rules
 from typing import List
 
 
@@ -79,116 +80,82 @@ class KT_TTS_Maker():
 
     def get_converted_symbol_items(
             self,
-            src_tts_items: List[KT_TTS]
-    ) -> List[KT_TTS]:
+            src_tts_items: [KT_TTS]
+    ) -> [KT_TTS]:
         ''' 특수 기호를 발음열 변환된 문장으로 변환 '''
 
+        id, src = src_tts_items.id, src_tts_items.sent
+        sp_char = special_rules.SYMBOL_RULES
         # 플러스
-        r_plus = r"\++\s*\d+\+*"
+        if re.search(sp_char['r_plus'], src):
+            special_char = re.findall(sp_char['r_plus'], src)
+            src = self._replace_word(src=src, special=special_char, symbol="+", replace_word=" 플러스 ")
         # 에
-        r_eh = r"(\d+\-\d+\-\d+|\d+\-\d+)"
-        # 마이너스
-        r_minus = r"(\-+\s*)+\d+"
+        if re.search(sp_char['r_eh'], src):
+            special_char = re.findall(sp_char['r_eh'], src)
+            src = self._replace_word(src=src, special=special_char, symbol="-", replace_word="에 ")
         # 묵음
-        r_blank = r"[가-힣]+(?:\-[가-힣]*)+|[가-힣]+(?:\/[가-힣]*)+"
+        if re.search(sp_char['r_blank'], src):
+            special_char = re.findall(sp_char['r_blank'], src)
+            src = self._replace_word(src=src, special=special_char, symbol="-", replace_word=" ")
+            src = self._replace_word(src=src, special=special_char, symbol="/", replace_word=" ")
+        # 마이너스
+        if re.search(sp_char['r_minus'], src):
+            special_char = re.findall(sp_char['r_minus'], src)
+            src = self._replace_word(src=src, special=special_char, symbol="-", replace_word=" 마이너스 ")
         # 곱하기
-        r_multi = r"\d+\s?\*\s?\d+"
+        if re.search(sp_char['r_multi'], src):
+            special_char = re.findall(sp_char['r_multi'], src)
+            src = self._replace_word(src=src, special=special_char, symbol="*", replace_word=" 곱하기 ")
         # 별
-        r_star = r"\*\d+"
+        if re.search(sp_char['r_star'], src):
+            special_char = re.findall(sp_char['r_star'], src)
+            src = self._replace_word(src=src, special=special_char, symbol="*", replace_word="별")
         # 나누기
-        r_division = r"\d+\s?/\s?\d+\s?="
+        if re.search(sp_char['r_division'], src):
+            special_char = re.findall(sp_char['r_division'], src)
+            src = self._replace_word(src=src, special=special_char, symbol="/", replace_word=" 나누기 ")
         # 년 월 일
-        r_date = r"\d{2,4}/\d{2}/\d{2}|\d{2,4}\.\d{2}.\d{2}"
+        if re.search(sp_char['r_date'], src):
+            special_char = re.findall(sp_char['r_date'], src)
+            src = self._replace_date(src=src, special=special_char)
         # 분에
-        r_fraction = r"\d+\s?/\s?\d+\s?"
+        if re.search(sp_char['r_fraction'], src):
+            special_char = re.findall(sp_char['r_fraction'], src)
+            src = self._replace_fraction(src=src, special=special_char, replace_word=" 분에 ")
         # 은/는
-        r_equal = r"="
+        if re.search(sp_char['r_equal'], src):
+            special_char = re.findall(sp_char['r_equal'], src)
+            src = self._replace_equal(src=src, special=special_char)
         # 시간
-        r_time = r"2[0-3]:[0-5][0-9]:[0-5][0-9]|[01][0-9]:[0-5][0-9]:[0-5][0-9]"
+        if re.search(sp_char['r_time'], src):
+            special_char = re.findall(sp_char['r_time'], src)
+            src = self._replace_time(src=src, special=special_char)
         # 샵
-        r_hash = r"#"
+        if re.search(sp_char['r_hash'], src):
+            special_char = re.findall(sp_char['r_hash'], src)
+            src = self._replace_word(src=src, special=special_char, symbol="#", replace_word="샵 ")
         # 엔
-        r_ampersand = r"[A-Za-z]&[A-Za-z]"
+        if re.search(sp_char['r_ampersand'], src):
+            special_char = re.findall(sp_char['r_ampersand'], src)
+            src = self._replace_word(src=src, special=special_char, symbol="&", replace_word=" 엔 ")
         # 이메일: 쩜, 골뱅이
-        r_email = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+        if re.search(sp_char['r_email'], src):
+            special_char = re.findall(sp_char['r_email'], src)
+            src = self._replace_word(src=src, special=special_char, symbol="@", replace_word=" 골뱅이 ")
+            special_char = [re.findall("\.", s) for s in special_char][0]
+            src = self._replace_word(src=src, special=special_char, symbol=".", replace_word=" 쩜 ")
         # 밑줄표
-        r_underline = r"[A-Za-z]+(?:_[A-Za-z]*)+"
+        if re.search(sp_char['r_underline'], src):
+            special_char = re.findall(sp_char['r_underline'], src)
+            src = self._replace_word(src=src, special=special_char, symbol="_", replace_word=" 밑줄표 ")
 
-        ret_src_items: List[KT_TTS] = []
-        for source in src_tts_items:
-            id, src = source.id, source.sent
-
-            # 플러스
-            if re.search(r_plus, src):
-                special_char = re.findall(r_plus, src)
-                src = self._replace_word(src=src, special=special_char, symbol="+", replace_word=" 플러스 ")
-            # 에
-            if re.search(r_eh, src):
-                special_char = re.findall(r_eh, src)
-                src = self._replace_word(src=src, special=special_char, symbol="-", replace_word="에 ")
-            # 묵음
-            if re.search(r_blank, src):
-                special_char = re.findall(r_blank, src)
-                src = self._replace_word(src=src, special=special_char, symbol="-", replace_word=" ")
-                src = self._replace_word(src=src, special=special_char, symbol="/", replace_word=" ")
-            # 마이너스
-            if re.search(r_minus, src):
-                special_char = re.findall(r_minus, src)
-                src = self._replace_word(src=src, special=special_char, symbol="-", replace_word=" 마이너스 ")
-            # 곱하기
-            if re.search(r_multi, src):
-                special_char = re.findall(r_multi, src)
-                src = self._replace_word(src=src, special=special_char, symbol="*", replace_word=" 곱하기 ")
-            # 별
-            if re.search(r_star, src):
-                special_char = re.findall(r_star, src)
-                src = self._replace_word(src=src, special=special_char, symbol="*", replace_word="별")
-            # 나누기
-            if re.search(r_division, src):
-                special_char = re.findall(r_division, src)
-                src = self._replace_word(src=src, special=special_char, symbol="/", replace_word=" 나누기 ")
-            # 년 월 일
-            if re.search(r_date, src):
-                special_char = re.findall(r_date, src)
-                src = self._replace_date(src=src, special=special_char)
-            # 분에
-            if re.search(r_fraction, src):
-                special_char = re.findall(r_fraction, src)
-                src = self._replace_fraction(src=src, special=special_char, replace_word=" 분에 ")
-            # 은/는
-            if re.search(r_equal, src):
-                special_char = re.findall(r_equal, src)
-                src = self._replace_equal(src=src, special=special_char)
-            # 시간
-            if re.search(r_time, src):
-                special_char = re.findall(r_time, src)
-                src = self._replace_time(src=src, special=special_char)
-            # 샵
-            if re.search(r_hash, src):
-                special_char = re.findall(r_hash, src)
-                src = self._replace_word(src=src, special=special_char, symbol="#", replace_word="샵 ")
-            # 엔
-            if re.search(r_ampersand, src):
-                special_char = re.findall(r_ampersand, src)
-                src = self._replace_word(src=src, special=special_char, symbol="&", replace_word=" 엔 ")
-            # 이메일: 쩜, 골뱅이
-            if re.search(r_email, src):
-                special_char = re.findall(r_email, src)
-                src = self._replace_word(src=src, special=special_char, symbol="@", replace_word=" 골뱅이 ")
-                special_char = [re.findall("\.", s) for s in special_char][0]
-                src = self._replace_word(src=src, special=special_char, symbol=".", replace_word=" 쩜 ")
-            # 밑줄표
-            if re.search(r_underline, src):
-                special_char = re.findall(r_underline, src)
-                src = self._replace_word(src=src, special=special_char, symbol="_", replace_word=" 밑줄표 ")
-
-            # 띄어쓰기 하나로
-            src = re.sub(r'\s{2,}', " ", src)
-            src = src.strip()
-            source = KT_TTS(id=id, sent=src)
-            ret_src_items.append(source)
+        # 띄어쓰기 하나로
+        src = re.sub(r'\s{2,}', " ", src)
+        src = src.strip()
+        source = KT_TTS(id=id, sent=src)
         # print(ret_src_items)
-        return ret_src_items
+        return source
 
     def _replace_word(self, src:str, special:List, symbol:str, replace_word:str) -> str:
         ''' 기본 단어 바꾸기 '''
@@ -262,7 +229,7 @@ if '__main__' == __name__:
     tts_maker = KT_TTS_Maker()
     b_txt2pkl = False
     b_symbol_rules = False
-    b_symbol_rules_per_sent = False
+    b_symbol_rules_per_sent = True
 
     '''
         *.txt -> *.pkl 변환 
@@ -283,11 +250,7 @@ if '__main__' == __name__:
     if b_symbol_rules:
         src = KT_TTS(id='0', sent="abc_def")
         tgt = KT_TTS(id='0', sent="십이 더하기 칠 은 십구")
-        sources: List[KT_TTS] = []
-        targets: List[KT_TTS] = []
-        sources.append(src)
-        targets.append(tgt)
-        new_sources = tts_maker.get_converted_symbol_items(sources)
+        new_sources = tts_maker.get_converted_symbol_items(src)
         print(new_sources)
 
     '''
@@ -297,3 +260,7 @@ if '__main__' == __name__:
     '''
     if b_symbol_rules_per_sent:
         ''' 여기서 테스트 :D '''
+        src = KT_TTS(id='0', sent="abc_def")
+        tgt = KT_TTS(id='0', sent="십이 더하기 칠 은 십구")
+        new_sources = tts_maker.get_converted_symbol_items(src)
+        print(new_sources)
