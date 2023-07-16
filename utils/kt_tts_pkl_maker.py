@@ -152,6 +152,12 @@ class KT_TTS_Maker():
 
         # 띄어쓰기 하나로
         src = re.sub(r'\s{2,}', " ", src)
+
+        '''
+            2023.07.16 - update by jaehoon
+        '''
+        src = src.replace(',', '').replace('.', '')
+
         src = src.strip()
         source = KT_TTS(id=id, sent=src)
         # print(ret_src_items)

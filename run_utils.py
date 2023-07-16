@@ -140,7 +140,7 @@ def make_digits_ensemble_data(
         raise Exception(f'ERR - data_path: {data_path}')
 
     ''' 특수문자 처리하기 위해  '''
-    symbol_converter = KT_TTS_Maker()
+    sym2kor = KT_TTS_Maker()
 
     src_path = data_path + '/' + mode + '_src.pkl'
     tgt_path = data_path + '/' + mode + '_tgt.pkl'
@@ -175,6 +175,9 @@ def make_digits_ensemble_data(
 
         ''' Convert num2kor '''
         src_data.sent = num2kor.generate(src_data.sent)
+
+        ''' Convert sym2kor '''
+        src_data = sym2kor.get_converted_symbol_items(src_data)
 
         if 0 == (r_idx % 1000):
             print(f'[run_utils][make_digits_ensemble_data] {r_idx} is processing... {src_data.sent}')
