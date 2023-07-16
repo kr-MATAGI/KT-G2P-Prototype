@@ -12,6 +12,7 @@ import numpy as np
 from typing import Dict, List
 from definition.data_def import KT_TTS
 from utils.error_fixer import ERR_SENT_ID_FIXED, ERR_SENT_CHANGED_FIXED
+from utils.kt_tts_pkl_maker import KT_TTS_Maker
 
 #===============================================================
 def init_logger():
@@ -137,6 +138,9 @@ def make_digits_ensemble_data(
 
     if not os.path.exists(data_path):
         raise Exception(f'ERR - data_path: {data_path}')
+
+    ''' 특수문자 처리하기 위해  '''
+    symbol_converter = KT_TTS_Maker()
 
     src_path = data_path + '/' + mode + '_src.pkl'
     tgt_path = data_path + '/' + mode + '_tgt.pkl'
