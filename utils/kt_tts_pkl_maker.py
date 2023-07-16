@@ -81,7 +81,7 @@ class KT_TTS_Maker():
     def get_converted_symbol_items(
             self,
             src_tts_items: [KT_TTS]
-    ) -> [KT_TTS]:
+    ) -> KT_TTS:
         ''' 특수 기호를 발음열 변환된 문장으로 변환 '''
 
         id, src = src_tts_items.id, src_tts_items.sent
