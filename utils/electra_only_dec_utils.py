@@ -70,9 +70,10 @@ class ElectraOnlyDecDataset(Dataset):
 #===============================================================
     def __init__(
             self,
+            args,
             item_dict: Dict[str, np.ndarray]
     ):
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = args.device
 
         self.src_tokens = torch.LongTensor(item_dict["src_tokens"]).to(device)
         self.src_len = torch.LongTensor(item_dict["src_lengths"]).to(device)

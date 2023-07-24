@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -22,12 +23,18 @@ def positional_encodings_like(x, t=None):   # hope to be differentiable
 
     # channels
     channels = torch.arange(0, x.size(-1), 2) / x.size(-1) # 0 2 4 6 ... (256)
-    if x.is_cuda:
-        channels = channels.cuda(x.get_device())
     channels = 1 / (10000 ** Variable(channels))
 
+    if x.is_cuda:
+        channels = channels.to('cuda')
+
     # get the positional encoding: batch x target_len
-    encodings = positions.unsqueeze(-1) @ channels.unsqueeze(0)  # batch x target_len x 256
+    positions = positions.unsqueeze(-1) # [256] -> [256, 1]
+    channels = channels.unsqueeze(0) # [384] -> [1, 384]
+    channels = torch.nan_to_num(channels)
+
+    # encodings = positions @ channels # batch x target_len x 256
+    encodings = torch.mm(positions, channels)
     encodings = torch.cat([torch.sin(encodings).unsqueeze(-1), torch.cos(encodings).unsqueeze(-1)], -1)
     encodings = encodings.contiguous().view(*encodings.size()[:-2], -1)  # batch x target_len x 512
 
@@ -72,7 +79,7 @@ def gumbel_softmax(input, beta=0.5, tau=1.0):
 #===============================================================
 class Decoder(nn.Module):
 #===============================================================
-    def __init__(self, args, dec_vocab, causal=True,
+    def __init__(self, args, src_vocab_size, dec_vocab, causal=True,
                 positional=False, diag=False,
                 highway=False, windows=None,
                 noisy=False, cosine_output=False):
@@ -86,6 +93,7 @@ class Decoder(nn.Module):
             [DecoderLayer(args, causal, diag, highway, windows[i], positional, noisy)
             for i in range(args.n_layers)])
 
+        self.inp = nn.Embedding(src_vocab_size, args.d_model)
         self.out = nn.Linear(args.d_model, len(dec_vocab))
 
         self.dropout = nn.Dropout(args.drop_ratio)
@@ -97,11 +105,13 @@ class Decoder(nn.Module):
 
     def forward(self, x, encoding, mask_src=None, mask_trg=None, input_embeddings=False, feedback=None, positions=None):
 
-        if not input_embeddings:  # compute input embeddings
-            if x.ndimension() == 2:
-                x = F.embedding(x, self.out.weight * math.sqrt(self.d_model))
-            elif x.ndimension() == 3:  # softmax relaxiation
-                x = x @ self.out.weight * math.sqrt(self.d_model)  # batch x len x embed_size
+        # if not input_embeddings:  # compute input embeddings
+        #     if x.ndimension() == 2:
+        #         x = F.embedding(x, self.out.weight * math.sqrt(self.d_model))
+        #     elif x.ndimension() == 3:  # softmax relaxiation
+        #         x = x @ self.out.weight * math.sqrt(self.d_model)  # batch x len x embed_size
+
+        x = self.inp(x)
 
         if not self.orderless:
             x += positional_encodings_like(x)
@@ -251,12 +261,14 @@ class DecoderLayer(nn.Module):
     def forward(self, x, encoding, p=None, mask_src=None, mask_trg=None, feedback=None):
         feedback_src = []
         feedback_trg = []
+
         x = self.selfattn(x, x, x, mask_trg, feedback_trg)   #
 
         if self.positional:
             pos_encoding, weights = positional_encodings_like(x), None
             x = self.pos_selfattn(pos_encoding, pos_encoding, x, mask_trg, None, weights)  # positional attention
-        x = self.feedforward(self.attention(x, encoding, encoding, mask_src, feedback_src))
+        x_attn =self.attention(x, encoding, encoding, mask_src, feedback_src)
+        x = self.feedforward(x_attn)
 
         if feedback is not None:
 

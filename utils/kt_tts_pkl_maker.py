@@ -149,6 +149,28 @@ class KT_TTS_Maker():
         if re.search(sp_char['r_underline'], src):
             special_char = re.findall(sp_char['r_underline'], src)
             src = self._replace_word(src=src, special=special_char, symbol="_", replace_word=" 밑줄표 ")
+        if re.search(sp_char['r_space'], src):
+            special_char = re.findall(sp_char['r_space'], src)
+            src = self._replace_word(src=src, special=special_char, symbol=":", replace_word=" ")
+            src = self._replace_word(src=src, special=special_char, symbol=",", replace_word=" ")
+            src = self._replace_word(src=src, special=special_char, symbol=">", replace_word=" ")
+
+        '''  number unit '''
+        if re.search(sp_char['r_micro_meter'], src):
+            special_char = re.findall(sp_char['r_micro_meter'], src)
+            src = self._replace_word(src=src, special=special_char, symbol="㎍/㎥", replace_word="마이크로그램 세제곰미터")
+        if re.search(sp_char['r_meter'], src):
+            special_char = re.findall(sp_char['r_meter'], src)
+            src = self._replace_word(src=src, special=special_char, symbol="㎥", replace_word="세제곰미터")
+        if re.search(sp_char['r_micro'], src):
+            special_char = re.findall(sp_char['r_micro'], src)
+            src = self._replace_word(src=src, special=special_char, symbol="㎍", replace_word="마이크로그램")
+        if re.search(sp_char['r_nanogram'], src):
+            special_char = re.findall(sp_char['r_nanogram'], src)
+            src = self._replace_word(src=src, special=special_char, symbol="ng/㎖", replace_word="나노그램 미리리터")
+        if re.search(sp_char['r_miri'], src):
+            special_char = re.findall(sp_char['r_miri'], src)
+            src = self._replace_word(src=src, special=special_char, symbol="㎖", replace_word="미리리터")
 
         # 띄어쓰기 하나로
         src = re.sub(r'\s{2,}', " ", src)
@@ -156,7 +178,10 @@ class KT_TTS_Maker():
         '''
             2023.07.16 - update by jaehoon
         '''
-        src = src.replace(',', '').replace('.', '')
+        ''' clean the src '''
+        # later !?.,~ add
+        sp_pattern = r"[^a-zA-Zㄱ-ㅎㅏ-ㅣ가-힣\s]+"
+        src = re.sub(sp_pattern, "", src)
 
         src = src.strip()
         source = KT_TTS(id=id, sent=src)
@@ -266,7 +291,7 @@ if '__main__' == __name__:
     '''
     if b_symbol_rules_per_sent:
         ''' 여기서 테스트 :D '''
-        src = KT_TTS(id='0', sent="abc_def")
+        src = KT_TTS(id='0', sent="스파이더맨:파")
         tgt = KT_TTS(id='0', sent="십이 더하기 칠 은 십구")
         new_sources = tts_maker.get_converted_symbol_items(src)
         print(new_sources)

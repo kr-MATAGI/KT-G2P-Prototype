@@ -1,7 +1,11 @@
 import os
 import re
+import sys
+
 import torch
 from torch.utils.data import Dataset
+import glob
+import itertools
 
 import pickle
 import logging
@@ -130,11 +134,11 @@ def make_eojeol_mecab_res(input_sent: str, mecab_res: List):
 
 #==================================================
 def make_digits_ensemble_data(
-        data_path: str, mode: str, num2kor,
+        data_path: str, num2kor,
         tokenizer, decode_vocab, max_seq_len: int=256
 ):
 #==================================================
-    print(f'[run_utils][make_digits_ensemble_data] mode: {mode}, data_path: {data_path}')
+    print(f'[run_utils][make_digits_ensemble_data], data_path: {data_path}')
 
     if not os.path.exists(data_path):
         raise Exception(f'ERR - data_path: {data_path}')
@@ -142,24 +146,53 @@ def make_digits_ensemble_data(
     ''' 특수문자 처리하기 위해  '''
     sym2kor = KT_TTS_Maker()
 
-    src_path = data_path + '/' + mode + '_src.pkl'
-    tgt_path = data_path + '/' + mode + '_tgt.pkl'
-    print(f'[run_utils][make_digits_ensemble_data] src_path: {src_path},\ntgt_path: {tgt_path}')
+    src_list = [f"{data_path}train_src.pkl", f"{data_path}dev_src.pkl", f"{data_path}test_src.pkl"]
+    tgt_list = [f"{data_path}train_tgt.pkl", f"{data_path}dev_tgt.pkl", f"{data_path}test_tgt.pkl"]
+    print(f'[run_utils][make_digits_ensemble_data] src_path: {src_list},\ntgt_path: {tgt_list}')
 
     all_src_data: List[KT_TTS] = []
-    with open(src_path, mode='rb') as s_f:
-        all_src_data = pickle.load(s_f)
-        print(f'[run_utils][make_digits_ensemble_data] all_src_data.size: {len(all_src_data)}')
-        print(f'{all_src_data[:10]}')
+    for src_path in src_list:
+        with open(src_path, mode='rb') as s_f:
+            all_src_data.extend(pickle.load(s_f))
+    print(f'[run_utils][make_digits_ensemble_data] all_src_data.size: {len(all_src_data)}')
+    print(f'{all_src_data[:10]}')
 
     all_tgt_data: List[KT_TTS] = []
-    with open(tgt_path, mode='rb') as t_f:
-        all_tgt_data = pickle.load(t_f)
-        print(f'[run_utils][make_digits_ensemble_data] all_tgt_data.size: {len(all_tgt_data)}')
-        print(f'{all_tgt_data[:10]}')
+    for tgt_path in tgt_list:
+        with open(tgt_path, mode='rb') as t_f:
+            all_tgt_data.extend(pickle.load(t_f))
+    print(f'[run_utils][make_digits_ensemble_data] all_tgt_data.size: {len(all_tgt_data)}')
+    print(f'{all_tgt_data[:10]}')
 
     assert len(all_src_data) == len(all_tgt_data), f'ERR - src_data.size != tgt_data.size'
 
+    # split data 8:1:1
+    total_size = len(all_src_data)
+    train_src_data, train_tgt_data = all_src_data[:int(total_size*0.8)], all_tgt_data[:int(total_size*0.8)]
+    val_src_data, val_tgt_data = all_src_data[int(total_size*0.8):int(total_size*0.9)], all_tgt_data[int(total_size*0.8):int(total_size*0.9)]
+    test_src_data, test_tgt_data = all_src_data[int(total_size*0.9):], all_tgt_data[int(total_size*0.9):]
+
+    assert len(train_src_data) == len(train_tgt_data), f'ERR - train_src_data.size != train_tgt_data.size'
+    assert len(val_src_data) == len(val_tgt_data), f'ERR - val_src_data.size != val_tgt_data.size'
+    assert len(test_src_data) == len(test_tgt_data), f'ERR - test_src_data.size != test_tgt_data.size'
+
+    train_dataset = _processing_src_tgt_data(train_src_data, train_tgt_data, num2kor,
+                                             sym2kor, tokenizer, max_seq_len, decode_vocab)
+
+    val_dataset = _processing_src_tgt_data(val_src_data, val_tgt_data, num2kor,
+                                             sym2kor, tokenizer, max_seq_len, decode_vocab)
+    test_dataset = _processing_src_tgt_data(test_src_data, test_tgt_data, num2kor,
+                                             sym2kor, tokenizer, max_seq_len, decode_vocab)
+
+    print(f"[run_utils][make_digits_ensemble_data] train/val/test = {len(train_src_data)}/{len(val_src_data)}/{len(test_src_data)}")
+
+    return train_dataset, val_dataset, test_dataset
+
+def _processing_src_tgt_data(all_src_data, all_tgt_data, num2kor, sym2kor, tokenizer,
+                             max_seq_len, decode_vocab):
+    '''
+        train, val, test pre-processing (digit->kor, symbol->kor)
+    '''
     # Tokenization
     ret_dict = {
         'src_tokens': [],
@@ -178,6 +211,16 @@ def make_digits_ensemble_data(
 
         ''' Convert sym2kor '''
         src_data = sym2kor.get_converted_symbol_items(src_data)
+
+        ''' Should Convert EngtoKor '''
+
+
+        ''' Check special characters in src_data '''
+        sp_pattern = r"[!@#$%^&*(),.?\":{}|<>]"
+        if re.search(sp_pattern, src_data.sent):
+            print("====================================")
+            print("[run_utils][_processing_src_tgt_data] symbol error", src_data)
+            sys.exit()
 
         if 0 == (r_idx % 1000):
             print(f'[run_utils][make_digits_ensemble_data] {r_idx} is processing... {src_data.sent}')
@@ -225,7 +268,6 @@ def make_digits_ensemble_data(
     # convert list to np
     for key, val in ret_dict.items():
         ret_dict[key] = torch.LongTensor(np.array(val))
-        print(f'[run_utils][make_digits_ensemble_data] {mode}.{key}.size: {ret_dict[key].size()}')
+        print(f'[run_utils][make_digits_ensemble_data] {key}.size: {ret_dict[key].size()}')
 
     return ret_dict
-

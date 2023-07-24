@@ -296,6 +296,6 @@ if '__main__' == __name__:
     nart_npy_maker.make_nart_npy(
         src_path='../data/kor/pkl/kor_source_filter.pkl',
         tgt_path='../data/kor/pkl/kor_target.pkl',
-        save_path='../data/kor/npy/only_dec',
+        save_path='../data/susa_kor/npy/only_dec',
         custom_vocab_path='../data/vocab/pron_eumjeol_vocab.json'
     )

@@ -45,7 +45,7 @@ class DB_Maker(metaclass=ABCMeta):
         pass
 
 #============================================
-class HeadWord_DB_Maker(DB_Maker):
+class HeadWord_DB_Maker:
 #============================================
     def __init__(
             self,
@@ -55,8 +55,10 @@ class HeadWord_DB_Maker(DB_Maker):
             표제어 기분석 사전
             적용순위 : 3
         '''
-        super(HeadWord_DB_Maker, self).__init__(db_path)
+        super(HeadWord_DB_Maker, self).__init__()
         print(f'[db_utils][HeadWord_DB_Maker] db_path: {db_path}, table_name: {table_name}')
+        self.db_path = db_path
+        self.table_name = table_name
 
     def create_table(self):
         print(f'[db_utils][HeadWord_DB_Maker]: table_name: {self.table_name}')
@@ -96,6 +98,50 @@ class HeadWord_DB_Maker(DB_Maker):
 
         conn.close()
         print(f'[db_utils][insert_table_items] Complete !')
+
+    def search_table_items(self, word_item: HeadWordItems, lower=False):
+        '''
+            search foreign word
+        '''
+
+        print(f'[db_utils][HeadWord_DB_Maker] table_name: {self.table_name} search {word_item}')
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        if lower:
+            query = f"SELECT pronun_list FROM {self.table_name} WHERE origin_lang COLLATE NOCASE = '{word_item.word}'" \
+                    f"and origin_lang_type = '영어'"
+        else:
+            query = f"SELECT pronun_list FROM {self.table_name} WHERE origin_lang = '{word_item.word}'" \
+                    f"and origin_lang_type = '영어'"
+        try:
+            cursor.execute(query)
+            rows = cursor.fetchall()
+        except:
+            return None
+
+        cursor.close()
+        conn.close()
+
+        return rows
+
+    def select_all_items(self):
+        ''' search all items '''
+        print(f'[db_utils][HeadWord_DB_Maker] table_name: {self.table_name} search all')
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        query = "SELECT * FROM {}".format(self.table_name)
+        cursor.execute(query)
+        rows = cursor.fetchall()
+
+        for row in rows:
+            print(row)
+
+        cursor.close()
+        conn.close()
+
+        return rows
+
 
 #============================================
 class ConjuWord_DB_Maker(DB_Maker):
@@ -157,6 +203,10 @@ if '__main__' == __name__:
         어떤 기분석 사전 DB를 만들지 설정
     '''
 
-
-    db_maker = DB_Maker(db_path=DB_PATH)
-    headword_db_maker = HeadWord_DB_Maker(db_path=DB_PATH)
+    # db_maker = DB_Maker(db_path=DB_PATH)
+    # headword_db_maker = HeadWord_DB_Maker(db_path=DB_PATH)
+    headword_db_maker = HeadWord_DB_Maker(db_path='../db/eng_database.db', table_name='words')
+    tmp = HeadWordItems(word="G")
+    results = headword_db_maker.search_table_items(tmp, lower=True)
+    print(results)
+    # _ = headword_db_maker.select_all_items()

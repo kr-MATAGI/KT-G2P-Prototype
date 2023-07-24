@@ -1,5 +1,5 @@
 {
-  "ckpt_dir": "ckpt-electra-digits-ensemble-0716-test",
+  "ckpt_dir": "ckpt-electra-digits-ensemble-0721-custom_vocab",
   "data_pkl": "./data/raw_split/",
   "evaluate_test_during_training": true,
   "eval_all_checkpoints": false,
@@ -16,16 +16,16 @@
   "max_grad_norm": 1.0,
   "model_type": "electra-base",
   "model_name_or_path": "monologg/kocharelectra-base-discriminator",
-  "output_dir": "electra-digits-ensemble-0716-test",
+  "output_dir": "electra-digits-ensemble-0721-custom_vocab",
   "seed": 42,
   "train_batch_size": 32,
   "eval_batch_size": 64,
-  "logging_steps": 1961,
-  "save_steps": 1961,
+  "logging_steps": 2055,
+  "save_steps": 2055,
   "learning_rate": 5e-5,
   "device": "cuda",
   "dec_layers": 6,
-  "use_custom_vocab": false,
+  "use_custom_vocab": true,
   "do_post_method": false,
   "use_our_sam": false
 }

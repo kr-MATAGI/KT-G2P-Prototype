@@ -69,51 +69,56 @@ def apply_our_sam_word_item(
     split_input_sent = input_sent.split(' ')
     split_pred_sent = pred_sent.split(' ')
     split_ans_sent = ans_sent.split(' ')
-    for inp_idx, inp_item in enumerate(split_input_sent):
-        include_flag = True
-        '''
-            NNG: 일반 명사
-            NNP: 고유 명사
-            VV : 동사
-            VA : 형용사
-        '''
-        b_include_nn = False
-        b_include_vv_va = False
-        for t_idx, tag in enumerate(pos_list[inp_idx]):
-            if tag in ['NNG', 'NNP']: # 어절 안에 명사 종류가 포함되어 있는가
-                ''' 명사가 포함된경우 명사만 포함되어있는가 '''
-                b_include_nn = True
-            else:
-                b_include_nn = False
-            if tag in ['VV', 'VA'] and 0 == t_idx: # 어절 안에 동사, 형용사가 포함되어 있는가?
-                ''' 동사, 형용사가 포함된 경우 첫 품사가 동사 or 형용사인가 '''
-                b_include_vv_va = True
-                break
 
-        if not b_include_nn and not b_include_vv_va:
-            continue
-
-        if (inp_item in our_sam_g2p_dict.keys()) and len(split_input_sent) == len(split_pred_sent) and \
-                (split_pred_sent[inp_idx] not in our_sam_g2p_dict[inp_item].pronun_list):
+    if len(split_pred_sent) != len(split_ans_sent):
+        is_change = False
+        return None, is_change
+    else:
+        for inp_idx, inp_item in enumerate(split_input_sent):
+            include_flag = True
             '''
-                복수 표준 발음 처리 (임시)
-                    - key-value 에서 value는 발음열들의 목록
-                    - 이 안에 없다면 현재 예측된 발음열을 교체
+                NNG: 일반 명사
+                NNP: 고유 명사
+                VV : 동사
+                VA : 형용사
             '''
-            split_pred_sent[inp_idx] = our_sam_g2p_dict[inp_item].pronun_list[0]
-            is_change = True
+            b_include_nn = False
+            b_include_vv_va = False
+            for t_idx, tag in enumerate(pos_list[inp_idx]):
+                if tag in ['NNG', 'NNP']: # 어절 안에 명사 종류가 포함되어 있는가
+                    ''' 명사가 포함된경우 명사만 포함되어있는가 '''
+                    b_include_nn = True
+                else:
+                    b_include_nn = False
+                if tag in ['VV', 'VA'] and 0 == t_idx: # 어절 안에 동사, 형용사가 포함되어 있는가?
+                    ''' 동사, 형용사가 포함된 경우 첫 품사가 동사 or 형용사인가 '''
+                    b_include_vv_va = True
+                    break
 
-            # For Debug
-            debug_info.input_word.append(inp_item)
-            debug_info.pred_word.append(split_pred_sent[inp_idx])
-            debug_info.our_sam_word.append(our_sam_g2p_dict[inp_item].pronun_list)
-            debug_info.pos = our_sam_g2p_dict[inp_item].pos
-            debug_info.ans_word.append(split_ans_sent[inp_idx])
-    # end loop, inp_item
+            if not b_include_nn and not b_include_vv_va:
+                continue
 
-    debug_info.conv_sent = ' '.join(split_pred_sent).strip()
+            if (inp_item in our_sam_g2p_dict.keys()) and len(split_input_sent) == len(split_pred_sent) and \
+                    (split_pred_sent[inp_idx] not in our_sam_g2p_dict[inp_item].pronun_list):
+                '''
+                    복수 표준 발음 처리 (임시)
+                        - key-value 에서 value는 발음열들의 목록
+                        - 이 안에 없다면 현재 예측된 발음열을 교체
+                '''
+                split_pred_sent[inp_idx] = our_sam_g2p_dict[inp_item].pronun_list[0]
+                is_change = True
 
-    return debug_info, is_change
+                # For Debug
+                debug_info.input_word.append(inp_item)
+                debug_info.pred_word.append(split_pred_sent[inp_idx])
+                debug_info.our_sam_word.append(our_sam_g2p_dict[inp_item].pronun_list)
+                debug_info.pos = our_sam_g2p_dict[inp_item].pos
+                debug_info.ans_word.append(split_ans_sent[inp_idx])
+        # end loop, inp_item
+
+        debug_info.conv_sent = ' '.join(split_pred_sent).strip()
+
+        return debug_info, is_change
 
 #========================================================
 def make_eojeol_mecab_res(input_sent: str, mecab_res: List):

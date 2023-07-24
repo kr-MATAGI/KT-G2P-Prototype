@@ -39,13 +39,13 @@ class ElectraNartPosDecModel(nn.Module):
         self.gap_ids = self.src_vocab.index(' ') # 5
 
     @classmethod
-    def build_decoder(cls, args, dec_vocab):
+    def build_decoder(cls, args, src_vocab, dec_vocab):
         base_decoder_architecture(args)
-        return Decoder(args=args, dec_vocab=dec_vocab, positional=True)
+        return Decoder(args=args, src_vocab_size=len(src_vocab), dec_vocab=dec_vocab, positional=True)
 
     @classmethod
     def build_model(cls, args, tokenizer, src_vocab, dec_vocab, post_proc_dict):
-        decoder = cls.build_decoder(args, dec_vocab)
+        decoder = cls.build_decoder(args, src_vocab, dec_vocab)
         electra = ElectraModel.from_pretrained(args.model_name_or_path, output_hidden_states=True)
         return ElectraNartPosDecModel(args, tokenizer, decoder, electra, src_vocab, dec_vocab, post_proc_dict)
 

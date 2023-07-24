@@ -29,10 +29,13 @@ from run_utils import (
 from utils.post_method import (
     make_g2p_word_dictionary, save_our_sam_debug, apply_our_sam_word_item
 )
+from utils.english_to_korean import Eng2Kor
+
 from utils.electra_only_dec_utils import (
     get_vocab_type_dictionary,
     ElectraOnlyDecDataset, make_electra_only_dec_inputs
 )
+
 
 ### OurSam Dict
 import platform
@@ -185,14 +188,14 @@ def evaluate(
 
     # wrong case
     wrong_df = pd.DataFrame(wrong_case)
-    wrong_df.to_csv(f"./results/ensemble/{mode}_wrong_case.csv", index=False, header=True)
+    wrong_df.to_csv(f"./results/ensemble/{mode}_wrong_case.csv", index=False, header=True, encoding="utf-8-sig")
 
-    ''' 우리말 사전 적용 결과 저장 '''
-    if args.use_our_sam and args.our_sam_debug:
-        save_our_sam_debug(all_item_save_path='./results/ensemble/our_sam_all.txt',
-                           wrong_item_save_path='./results/ensemble/our_sam_wrong.txt',
-                           our_sam_debug_list=all_our_sam_debug_info)
-        print(f'[run_ensemble][evaluate] OurSamDebug info Save Complete !')
+    # ''' 우리말 사전 적용 결과 저장 '''
+    # if args.use_our_sam and args.our_sam_debug:
+    #     save_our_sam_debug(all_item_save_path='./results/ensemble/our_sam_all.txt',
+    #                        wrong_item_save_path='./results/ensemble/our_sam_wrong.txt',
+    #                        our_sam_debug_list=all_our_sam_debug_info)
+    #     print(f'[run_ensemble][evaluate] OurSamDebug info Save Complete !')
 
 #===============================================================
 def train(
@@ -374,14 +377,15 @@ def main(
                                                post_proc_dict=post_proc_dict)
     model.to(args.device)
 
+    # pre-processing & data split
+    train_datasets, dev_datasets, test_datasets = make_digits_ensemble_data(data_path=args.data_pkl,
+                                                                            num2kor=numeral_model,
+                                                                            tokenizer=tokenizer,
+                                                                            decode_vocab=dec_vocab)
     # Do Train
     if args.do_train:
-        train_datasets = make_digits_ensemble_data(data_path=args.data_pkl, mode='train', num2kor=numeral_model,
-                                                   tokenizer=tokenizer, decode_vocab=dec_vocab)
-        dev_datasets = make_digits_ensemble_data(data_path=args.data_pkl, mode='dev', num2kor=numeral_model,
-                                                 tokenizer=tokenizer, decode_vocab=dec_vocab)
-        train_datasets = ElectraOnlyDecDataset(item_dict=train_datasets)
-        dev_datasets = ElectraOnlyDecDataset(item_dict=dev_datasets)
+        train_datasets = ElectraOnlyDecDataset(args=args, item_dict=train_datasets)
+        dev_datasets = ElectraOnlyDecDataset(args=args, item_dict=dev_datasets)
 
         global_step, tr_loss = train(args, model,
                                      train_datasets, dev_datasets,
@@ -390,9 +394,7 @@ def main(
 
     # Do Eval
     if args.do_eval:
-        test_datasets = make_digits_ensemble_data(data_path=args.data_pkl, mode='test', num2kor=numeral_model,
-                                                  tokenizer=tokenizer, decode_vocab=dec_vocab)
-        test_datasets = ElectraOnlyDecDataset(item_dict=test_datasets)
+        test_datasets = ElectraOnlyDecDataset(args=args, item_dict=test_datasets)
         checkpoints = list(os.path.dirname(c) for c in
                            sorted(glob.glob(args.output_dir + "/**/" + "model.pt", recursive=True),
                                   key=lambda path_with_step: list(map(int, re.findall(r"\d+", path_with_step)))[-1]))
@@ -406,6 +408,8 @@ def main(
 
         for checkpoint in checkpoints:
             global_step = checkpoint.split("-")[-1]
+
+
             model = ElectraNartPosDecModel.build_model(args=args, tokenizer=tokenizer,
                                                        src_vocab=src_vocab, dec_vocab=dec_vocab,
                                                        post_proc_dict=post_proc_dict)
