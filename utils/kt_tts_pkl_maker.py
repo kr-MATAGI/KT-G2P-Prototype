@@ -155,23 +155,6 @@ class KT_TTS_Maker():
             src = self._replace_word(src=src, special=special_char, symbol=",", replace_word=" ")
             src = self._replace_word(src=src, special=special_char, symbol=">", replace_word=" ")
 
-        '''  number unit '''
-        if re.search(sp_char['r_micro_meter'], src):
-            special_char = re.findall(sp_char['r_micro_meter'], src)
-            src = self._replace_word(src=src, special=special_char, symbol="㎍/㎥", replace_word="마이크로그램 세제곰미터")
-        if re.search(sp_char['r_meter'], src):
-            special_char = re.findall(sp_char['r_meter'], src)
-            src = self._replace_word(src=src, special=special_char, symbol="㎥", replace_word="세제곰미터")
-        if re.search(sp_char['r_micro'], src):
-            special_char = re.findall(sp_char['r_micro'], src)
-            src = self._replace_word(src=src, special=special_char, symbol="㎍", replace_word="마이크로그램")
-        if re.search(sp_char['r_nanogram'], src):
-            special_char = re.findall(sp_char['r_nanogram'], src)
-            src = self._replace_word(src=src, special=special_char, symbol="ng/㎖", replace_word="나노그램 미리리터")
-        if re.search(sp_char['r_miri'], src):
-            special_char = re.findall(sp_char['r_miri'], src)
-            src = self._replace_word(src=src, special=special_char, symbol="㎖", replace_word="미리리터")
-
         # 띄어쓰기 하나로
         src = re.sub(r'\s{2,}', " ", src)
 

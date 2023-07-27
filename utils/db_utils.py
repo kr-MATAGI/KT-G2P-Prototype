@@ -56,7 +56,7 @@ class HeadWord_DB_Maker:
             적용순위 : 3
         '''
         super(HeadWord_DB_Maker, self).__init__()
-        print(f'[db_utils][HeadWord_DB_Maker] db_path: {db_path}, table_name: {table_name}')
+#         print(f'[db_utils][HeadWord_DB_Maker] db_path: {db_path}, table_name: {table_name}')
         self.db_path = db_path
         self.table_name = table_name
 
@@ -103,8 +103,6 @@ class HeadWord_DB_Maker:
         '''
             search foreign word
         '''
-
-        print(f'[db_utils][HeadWord_DB_Maker] table_name: {self.table_name} search {word_item}')
 
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()

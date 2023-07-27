@@ -12,12 +12,16 @@ import logging
 import copy
 import random
 import numpy as np
+import pandas as pd
 
 from typing import Dict, List
 from definition.data_def import KT_TTS
 from utils.error_fixer import ERR_SENT_ID_FIXED, ERR_SENT_CHANGED_FIXED
 from utils.kt_tts_pkl_maker import KT_TTS_Maker
+from utils.english_to_korean import Eng2Kor
 
+# pass english sentence
+eng_count = []
 #===============================================================
 def init_logger():
 # ===============================================================
@@ -157,6 +161,18 @@ def make_digits_ensemble_data(
     print(f'[run_utils][make_digits_ensemble_data] all_src_data.size: {len(all_src_data)}')
     print(f'{all_src_data[:10]}')
 
+    # # Test
+    # train_len, val_len, test_len = 0, 0, 0
+    # with open(f"{data_path}train_src.pkl", mode='rb') as t_f:
+    #     t = pickle.load(t_f)
+    #     train_len = len(t)
+    # with open(f"{data_path}dev_src.pkl", mode='rb') as t_f:
+    #     t = pickle.load(t_f)
+    #     val_len = len(t)
+    # with open(f"{data_path}test_src.pkl", mode='rb') as t_f:
+    #     t = pickle.load(t_f)
+    #     test_len = len(t)
+    #
     all_tgt_data: List[KT_TTS] = []
     for tgt_path in tgt_list:
         with open(tgt_path, mode='rb') as t_f:
@@ -172,6 +188,13 @@ def make_digits_ensemble_data(
     val_src_data, val_tgt_data = all_src_data[int(total_size*0.8):int(total_size*0.9)], all_tgt_data[int(total_size*0.8):int(total_size*0.9)]
     test_src_data, test_tgt_data = all_src_data[int(total_size*0.9):], all_tgt_data[int(total_size*0.9):]
 
+
+    # train_src_data, train_tgt_data = all_src_data[:train_len], all_tgt_data[:train_len]
+    # val_src_data, val_tgt_data = all_src_data[train_len:train_len+val_len], all_tgt_data[train_len:train_len+val_len]
+    # test, test_tgt = all_src_data[train_len+val_len:train_len+val_len+test_len], all_tgt_data[train_len+val_len:train_len+val_len+test_len]
+
+
+
     assert len(train_src_data) == len(train_tgt_data), f'ERR - train_src_data.size != train_tgt_data.size'
     assert len(val_src_data) == len(val_tgt_data), f'ERR - val_src_data.size != val_tgt_data.size'
     assert len(test_src_data) == len(test_tgt_data), f'ERR - test_src_data.size != test_tgt_data.size'
@@ -185,6 +208,11 @@ def make_digits_ensemble_data(
                                              sym2kor, tokenizer, max_seq_len, decode_vocab)
 
     print(f"[run_utils][make_digits_ensemble_data] train/val/test = {len(train_src_data)}/{len(val_src_data)}/{len(test_src_data)}")
+
+    print(f"[run_utils][make_digits_ensemble_data] pass english sentence = {len(eng_count)}")
+
+    err_eng_df = pd.DataFrame(eng_count)
+    err_eng_df.to_csv('no_match_eng.txt', index=False, encoding='utf-8')
 
     return train_dataset, val_dataset, test_dataset
 
@@ -212,7 +240,16 @@ def _processing_src_tgt_data(all_src_data, all_tgt_data, num2kor, sym2kor, token
         ''' Convert sym2kor '''
         src_data = sym2kor.get_converted_symbol_items(src_data)
 
-        ''' Should Convert EngtoKor '''
+        ''' Convert Eng2Kor '''
+        eng2kor = Eng2Kor()
+        src_data = eng2kor.convert_eng(src_data)
+
+        ''' Check english word in src_data '''
+        r_eng = r"[a-zA-Z]+"
+        if re.search(r_eng, src_data.sent):
+            global eng_count
+            eng_count.append(src_data.sent)
+            continue
 
 
         ''' Check special characters in src_data '''

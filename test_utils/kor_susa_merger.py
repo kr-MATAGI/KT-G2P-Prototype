@@ -335,19 +335,9 @@ class KorSusaDataMerger:
             npy_dict['attention_mask'].append(src_tokens['attention_mask'][0])
             npy_dict['token_type_ids'].append(src_tokens['token_type_ids'][0])
             # npy_dict['prev_output_tokens'].append(src_tokens['input_ids'][0])
-
-            ''' 2023.07.21 Testing '''
-            if self.b_use_custom_vocab:
-                pad_prev_output = ['[CLS]'] + ['[PAD]'] * (max_seq_len - 1)
-                pad_prev_output[sep_idx] = '[SEP]'
-                pad_prev_output = [decoder_vocab[x] for x in pad_prev_output]
-
-                npy_dict['prev_output_tokens'].append(pad_prev_output)
-            else:
-                npy_dict['prev_output_tokens'].append(src_tokens['input_ids'][0])
+            npy_dict['prev_output_tokens'] = ['[PAD]' for _ in range(len(src_tokens['input_ids'][0]))]
 
             npy_dict['target'].append(tgt_tokens['input_ids'][0])
-
         # end loop
 
         # convert list to np

@@ -27,8 +27,9 @@ from run_utils import (
 )
 
 from utils.post_method import (
-    make_g2p_word_dictionary, save_our_sam_debug, apply_our_sam_word_item
+    make_g2p_word_dictionary, save_our_sam_debug, apply_our_sam_word_item, re_evaluate_apply_dict
 )
+
 from utils.english_to_korean import Eng2Kor
 
 from utils.electra_only_dec_utils import (
@@ -68,6 +69,8 @@ def evaluate(
     references = []
     candidates = []
     total_correct = 0
+
+    input_sent_list = []
 
     wrong_case = {
         "input_sent": [],
@@ -155,6 +158,8 @@ def evaluate(
                 wrong_case["input_sent"].append(input_sent)
                 wrong_case["pred_sent"].append(pred_sent)
                 wrong_case["ans_sent"].append(ans_sent)
+
+            input_sent_list.append(input_sent)
     # end loop, decode
 
     wer_score = hug_eval.load("wer").compute(predictions=candidates, references=references)
@@ -190,12 +195,18 @@ def evaluate(
     wrong_df = pd.DataFrame(wrong_case)
     wrong_df.to_csv(f"./results/ensemble/{mode}_wrong_case.csv", index=False, header=True, encoding="utf-8-sig")
 
-    # ''' 우리말 사전 적용 결과 저장 '''
-    # if args.use_our_sam and args.our_sam_debug:
-    #     save_our_sam_debug(all_item_save_path='./results/ensemble/our_sam_all.txt',
-    #                        wrong_item_save_path='./results/ensemble/our_sam_wrong.txt',
-    #                        our_sam_debug_list=all_our_sam_debug_info)
-    #     print(f'[run_ensemble][evaluate] OurSamDebug info Save Complete !')
+    ''' 우리말 사전 적용 결과 저장 '''
+    if args.use_our_sam and is_change:
+        save_our_sam_debug(all_item_save_path='./results/ensemble/our_sam_all.txt',
+                           wrong_item_save_path='./results/ensemble/our_sam_wrong.txt',
+                           our_sam_debug_list=all_our_sam_debug_info)
+        print(f'[run_ensemble][evaluate] OurSamDebug info Save Complete !')
+
+    if args.use_our_sam:
+        re_evaluate_apply_dict(target_items=all_our_sam_debug_info,
+                               input_sent_list=input_sent_list,
+                               pred_sent_list=candidates,
+                               ans_sent_list=references)
 
 #===============================================================
 def train(

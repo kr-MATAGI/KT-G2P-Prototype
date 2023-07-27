@@ -8,17 +8,18 @@ from definition.alphabet import ALPHABET
 
 from typing import List
 
+
 class Eng2Kor:
     ''' English word to Korean word '''
 
     def __init__(self):
-        print("[utils][english_to_korean] db connecting....")
-        self.headword_db_maker = HeadWord_DB_Maker(db_path='../db/eng_database.db', table_name='words')
+
+        self.headword_db_maker = HeadWord_DB_Maker(db_path='db/eng_database.db', table_name='words')
 
     def convert_eng(self, source: str) -> str:
         r_eng_pattern = r"[a-zA-Z]+"
 
-        eng_words = re.findall(r_eng_pattern, source)
+        eng_words = re.findall(r_eng_pattern, source.sent)
 
         for word in eng_words:
             eng = HeadWordItems(word=word)
@@ -28,6 +29,7 @@ class Eng2Kor:
 
             # if no results and word is uppercase then read in the alphabet
             if len(results) < 1 and word.isupper():
+
                 alpha_pronun = ""
                 alphabet = ALPHABET
                 for w in word:
@@ -36,7 +38,7 @@ class Eng2Kor:
 
             # if english word in db
             if len(results) > 0:
-                source = source.replace(word, results[0][0])
+                source.sent = source.sent.replace(word, results[0][0])
 
         return source
 
