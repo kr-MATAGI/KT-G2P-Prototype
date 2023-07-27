@@ -161,18 +161,6 @@ def make_digits_ensemble_data(
     print(f'[run_utils][make_digits_ensemble_data] all_src_data.size: {len(all_src_data)}')
     print(f'{all_src_data[:10]}')
 
-    # # Test
-    # train_len, val_len, test_len = 0, 0, 0
-    # with open(f"{data_path}train_src.pkl", mode='rb') as t_f:
-    #     t = pickle.load(t_f)
-    #     train_len = len(t)
-    # with open(f"{data_path}dev_src.pkl", mode='rb') as t_f:
-    #     t = pickle.load(t_f)
-    #     val_len = len(t)
-    # with open(f"{data_path}test_src.pkl", mode='rb') as t_f:
-    #     t = pickle.load(t_f)
-    #     test_len = len(t)
-    #
     all_tgt_data: List[KT_TTS] = []
     for tgt_path in tgt_list:
         with open(tgt_path, mode='rb') as t_f:
@@ -187,13 +175,6 @@ def make_digits_ensemble_data(
     train_src_data, train_tgt_data = all_src_data[:int(total_size*0.8)], all_tgt_data[:int(total_size*0.8)]
     val_src_data, val_tgt_data = all_src_data[int(total_size*0.8):int(total_size*0.9)], all_tgt_data[int(total_size*0.8):int(total_size*0.9)]
     test_src_data, test_tgt_data = all_src_data[int(total_size*0.9):], all_tgt_data[int(total_size*0.9):]
-
-
-    # train_src_data, train_tgt_data = all_src_data[:train_len], all_tgt_data[:train_len]
-    # val_src_data, val_tgt_data = all_src_data[train_len:train_len+val_len], all_tgt_data[train_len:train_len+val_len]
-    # test, test_tgt = all_src_data[train_len+val_len:train_len+val_len+test_len], all_tgt_data[train_len+val_len:train_len+val_len+test_len]
-
-
 
     assert len(train_src_data) == len(train_tgt_data), f'ERR - train_src_data.size != train_tgt_data.size'
     assert len(val_src_data) == len(val_tgt_data), f'ERR - val_src_data.size != val_tgt_data.size'
