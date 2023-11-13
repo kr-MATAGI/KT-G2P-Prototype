@@ -8,6 +8,9 @@ from definition.data_def import KT_TTS
 from definition import special_rules
 from typing import List
 
+from pyjosa.josa import Josa
+from utils.db_utils import ChnWord_DB_Maker
+from definition.db_def import ChnWordItems
 
 #==========================================
 class KT_TTS_Maker():
@@ -52,7 +55,7 @@ class KT_TTS_Maker():
             t_id = t_line[0]
             t_sent = t_line[1]
 
-            if s_id != t_id:
+            if int(s_id) != int(t_id):
                 err_cnt += 1
                 print(f'[KT_TTS_Maker][get_kt_tts_items] ERR ! - s_id: {s_id}, t_id: {t_id}')
                 continue
@@ -163,7 +166,9 @@ class KT_TTS_Maker():
         '''
         ''' clean the src '''
         # later !?.,~ add
-        sp_pattern = r"[^a-zA-Zㄱ-ㅎㅏ-ㅣ가-힣\s]+"
+        blank_pattern =  r"(?<=\S)([^a-zA-Zㄱ-ㅎㅏ-ㅣ가-힣\s]+)(?=\S)"
+        src = re.sub(blank_pattern, " ", src)
+        sp_pattern = r"[^a-zA-Zㄱ-ㅎㅏ-ㅣ가-힣\s\u4e00-\u9fff]+"
         src = re.sub(sp_pattern, "", src)
 
         src = src.strip()
@@ -210,17 +215,15 @@ class KT_TTS_Maker():
 
     def _replace_equal(self, src: str, special: List) -> str:
         ''' = -> 은/는 '''
-        # 은 발음
-        uen = ['0', '1', '3', '6', '7', '8', '9']
 
         for s in special:
-            # 기호 = 앞의 숫자 '은' 발음
-            if src.split("=")[0].strip()[-1] in uen:
-                sent = s.replace(s, '은')
-            # 그 외는 '는' 발음
-            else:
-                sent = s.replace(s, '는')
-            src = src.replace(s, sent)
+            try:
+                # 기호 = 앞의 숫자 '은' 발음
+                josa = Josa.get_josa(src.split("=")[0].strip(), '은')
+                sent = s.replace(s, josa)
+                src = src.replace(s, sent)
+            except:
+                src = src.replace(s, '은')
         return src
 
     def _replace_time(self, src: str, special: List) -> str:
@@ -236,22 +239,42 @@ class KT_TTS_Maker():
             src = src.replace(s, sent)
         return src
 
+    def convert_chinese(self, src_tts_items: [KT_TTS]) -> KT_TTS:
+        ''' convert chinese to korean '''
+        id, src = src_tts_items.id, src_tts_items.sent
+        hanja_pattern = r'[\u4e00-\u9fff]+'  # 한자의 유니코드 범위
+        words = re.findall(hanja_pattern, src)
+
+        for word in words:
+            chn_item = ChnWordItems(word=word)
+            chn_db = ChnWord_DB_Maker(db_path='db/chn_database.db', table_name='words')
+            chn_result = chn_db.search_table_items(chn_item)
+
+            if len(chn_result) > 0:
+                src = src.replace(word, chn_result[0][0])
+            else:
+                src = src.replace(word, "")
+
+        return KT_TTS(id=id, sent=src)
+
+
+
 ### MAIN ###
 if '__main__' == __name__:
     print(f'[kt_tts_pkl_maker][__main__] MAIN !')
 
     tts_maker = KT_TTS_Maker()
-    b_txt2pkl = False
+    b_txt2pkl = True
     b_symbol_rules = False
-    b_symbol_rules_per_sent = True
+    b_symbol_rules_per_sent = False
 
     '''
         *.txt -> *.pkl 변환 
     '''
     if b_txt2pkl:
-        src_path = '../data/kt_tts/tts_script_85ks_ms949_200407.txt'
-        tgt_path = '../data/kt_tts/tts_script_85ks_ms949_200506_g2p.txt'
-        pkl_path = '../data/kt_tts/pkl/'
+        src_path = '../data/tts_script_85ks_ms949_200407_utf.txt'
+        tgt_path = '../data/tts_script_85ks_ms949_200506_g2p_utf_updated.txt'
+        pkl_path = '../data/kt_tts/'
         tts_src_items, tts_tgt_items = tts_maker.get_kt_tts_items(
             raw_src_path=src_path, raw_tgt_path=tgt_path, save_path=pkl_path
         )
@@ -274,7 +297,8 @@ if '__main__' == __name__:
     '''
     if b_symbol_rules_per_sent:
         ''' 여기서 테스트 :D '''
-        src = KT_TTS(id='0', sent="스파이더맨:파")
-        tgt = KT_TTS(id='0', sent="십이 더하기 칠 은 십구")
+        src = KT_TTS(id='0', sent="십이 + 십이 = 小 2")
+        tgt = KT_TTS(id='0', sent="십이 더하기 칠  십구")
         new_sources = tts_maker.get_converted_symbol_items(src)
+        new_sources = tts_maker.convert_chinese(src)
         print(new_sources)

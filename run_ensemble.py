@@ -23,14 +23,13 @@ import pandas as pd
 import evaluate as hug_eval
 
 from run_utils import (
-    init_logger, print_args, set_seed, make_digits_ensemble_data
+    init_logger, print_args, set_seed, make_digits_ensemble_data,
+    make_inference_data
 )
 
 from utils.post_method import (
     make_g2p_word_dictionary, save_our_sam_debug, apply_our_sam_word_item, re_evaluate_apply_dict
 )
-
-from utils.english_to_korean import Eng2Kor
 
 from utils.electra_only_dec_utils import (
     get_vocab_type_dictionary,
@@ -54,6 +53,131 @@ mecab = Mecab()
 numeral_model = Label2Num(mecab)
 tokenizer = KoCharElectraTokenizer.from_pretrained('monologg/kocharelectra-base-discriminator')
 
+
+#===============================================================
+def insert_special_characters(sent, tgt):
+    ''' add special character in target '''
+    special_characters = re.findall(r'([!?.,~])(?!\d)', sent)  # 숫자 뒤에 오는 특수문자는 제외
+    tgt_list = list(tgt)
+
+    index = 0
+    for m in re.finditer(r'([!?.,~])(?!\d)', sent):
+        while index < len(tgt_list) and m.start() > index:
+            index += 1
+        tgt_list.insert(index, m.group(1))
+        index += 1
+
+    return ''.join(tgt_list)
+#===============================================================
+def inference(
+        args, model, eval_datasets, mode,
+        src_vocab, dec_vocab, global_step, our_sam_vocab, origin_sentences
+):
+    # init
+    logger.info("***** Running inference on {} dataset *****".format(mode))
+
+    eval_steps = 0
+    candidates = []
+    input_sent_list = []
+
+    all_case = {
+        "input_sent": [],
+        "pred_sent": [],
+    }
+
+    batch_src_tok_list = []
+    pred_tok_list = []
+
+    # 우리말샘 기분석 삿전을 통해 바뀐 문장 갯수
+    all_our_sam_debug_info: List[OurSamItem] = []
+    total_change_cnt = 0
+
+    eval_sampler = SequentialSampler(eval_datasets)
+    eval_dataloader = DataLoader(eval_datasets, sampler=eval_sampler, batch_size=args.eval_batch_size)
+    eval_pbar = tqdm(eval_dataloader)
+
+    cuda_starter, cuda_ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+    cuda_times = []
+
+    model.eval()
+    start_time = time.time()
+    for batch in eval_pbar:
+        torch.cuda.synchronize()
+        with torch.no_grad():
+            inputs = make_electra_only_dec_inputs(batch)
+            inputs["mode"] = "eval"
+
+            cuda_starter.record()
+            output = model(**inputs)
+            cuda_ender.record()
+            torch.cuda.synchronize()
+            cuda_times.append(cuda_starter.elapsed_time(cuda_ender) / 1000)
+
+
+            batch_src_tok_list.append(inputs["src_tokens"].detach().cpu())
+            pred_tok_list.append(torch.argmax(output, -1).detach().cpu())
+
+        eval_steps += 1
+        eval_pbar.set_description("Eval - %d" % eval_steps)
+    # end loop
+    end_time = time.time()
+
+    # Decode
+    for src_tok, pred_tok in zip(batch_src_tok_list, pred_tok_list):
+        for d_idx, (input_i, pred) in enumerate(zip(src_tok, pred_tok)):
+            input_sent = "".join([src_vocab[x] for x in input_i.tolist()]).strip()
+            pred_sent = "".join([dec_vocab[x] for x in pred.tolist()]).strip()
+
+            input_sent = re.sub(r"\[CLS\]|\[SEP\]|\[PAD\]", "", input_sent)
+            pred_sent = re.sub(r"\[CLS\]|\[SEP\]|\[PAD\]", "", pred_sent)
+
+            # ise speicial_token : [?!,.~]
+            if args.use_special:
+                sent = origin_sentences[d_idx]
+                sent = re.sub(r'[^!?.,~\s\w]', '', sent)
+
+                pred_sent = insert_special_characters(sent, pred_sent)
+
+
+            if args.use_our_sam:
+                our_sam_res, is_change = apply_our_sam_word_item(our_sam_g2p_dict=our_sam_vocab,
+                                                                 mecab=mecab,
+                                                                 input_sent=input_sent,
+                                                                 pred_sent=pred_sent,
+                                                                 ans_sent="")
+                if is_change:
+                    pred_sent = our_sam_res.conv_sent
+                    total_change_cnt += 1
+                    all_our_sam_debug_info.append(our_sam_res)
+
+            candidates.append(pred_sent)
+
+            all_case["pred_sent"].append(pred_sent)
+
+            input_sent_list.append(input_sent)
+
+    # end loop, decode
+
+    print(f"[run_ensemble][evaluate] Elapsed time: {end_time - start_time} seconds")
+    print(f'[run_ensemble][evaluate] CUDA time: {sum(cuda_times)} seconds')
+
+    logger.info("---Eval End !")
+    eval_pbar.close()
+
+    # all case
+    all_case["input_sent"] = origin_sentences
+    all_df = pd.DataFrame(all_case)
+    all_df.to_csv(f"./results/ensemble/conversion_train_sp.csv", index=False, header=True, encoding="utf-8-sig")
+
+    ''' 우리말 사전 적용 결과 저장 '''
+    save_our_sam_debug(all_item_save_path='./results/ensemble/our_sam_all_inference.txt',
+                       wrong_item_save_path='./results/ensemble/our_sam_inference.txt',
+                       our_sam_debug_list=all_our_sam_debug_info)
+    print(f'[run_ensemble][evaluate] OurSamDebug info Save Complete !')
+
+
+#===============================================================
+
 #===============================================================
 def evaluate(
         args, model, eval_datasets, mode,
@@ -73,6 +197,13 @@ def evaluate(
     input_sent_list = []
 
     wrong_case = {
+        "input_sent": [],
+        "pred_sent": [],
+        "ans_sent": []
+    }
+
+
+    corr_case = {
         "input_sent": [],
         "pred_sent": [],
         "ans_sent": []
@@ -144,16 +275,19 @@ def evaluate(
                     total_change_cnt += 1
                     all_our_sam_debug_info.append(our_sam_res)
 
-            print(f"{d_idx}\n"
-                  f"input_sent:\n{input_sent}\n"
-                  f"pred_sent:\n{pred_sent}\n"
-                  f"ans_snet:\n{ans_sent}\n")
+            # print(f"{d_idx}\n"
+            #       f"input_sent:\n{input_sent}\n"
+            #       f"pred_sent:\n{pred_sent}\n"
+            #       f"ans_snet:\n{ans_sent}\n")
 
             candidates.append(pred_sent)
             references.append(ans_sent)
 
             if ans_sent == pred_sent:
                 total_correct += 1
+                corr_case["input_sent"].append(input_sent)
+                corr_case["pred_sent"].append(pred_sent)
+                corr_case["ans_sent"].append(ans_sent)
             else:
                 wrong_case["input_sent"].append(input_sent)
                 wrong_case["pred_sent"].append(pred_sent)
@@ -195,8 +329,11 @@ def evaluate(
     wrong_df = pd.DataFrame(wrong_case)
     wrong_df.to_csv(f"./results/ensemble/{mode}_wrong_case.csv", index=False, header=True, encoding="utf-8-sig")
 
+    corr_df = pd.DataFrame(corr_case)
+    corr_df.to_csv(f"./results/ensemble/{mode}_corr_case.csv", index=False, header=True, encoding="utf-8-sig")
+
     ''' 우리말 사전 적용 결과 저장 '''
-    if args.use_our_sam and is_change:
+    if args.use_our_sam:
         save_our_sam_debug(all_item_save_path='./results/ensemble/our_sam_all.txt',
                            wrong_item_save_path='./results/ensemble/our_sam_wrong.txt',
                            our_sam_debug_list=all_our_sam_debug_info)
@@ -276,6 +413,7 @@ def train(
             output = model(**inputs)
             output = F.log_softmax(output, -1)
 
+
             loss = criterion(output.reshape(-1, len(dec_vocab)), batch["tgt_tokens"].view(-1).to(args.device))
             loss.backward()
             optimizer.step()
@@ -314,6 +452,7 @@ def train(
 
         logger.info("   Epoch Done= %d", epoch + 1)
         pbar.close()
+
 
     return global_step, tr_loss / global_step
 
@@ -389,10 +528,12 @@ def main(
     model.to(args.device)
 
     # pre-processing & data split
-    train_datasets, dev_datasets, test_datasets = make_digits_ensemble_data(data_path=args.data_pkl,
-                                                                            num2kor=numeral_model,
-                                                                            tokenizer=tokenizer,
-                                                                            decode_vocab=dec_vocab)
+    if args.do_train or args.do_eval:
+        train_datasets, dev_datasets, test_datasets = make_digits_ensemble_data(args=args,
+                                                                                data_path=args.data_pkl,
+                                                                                num2kor=numeral_model,
+                                                                                tokenizer=tokenizer,
+                                                                                decode_vocab=dec_vocab)
     # Do Train
     if args.do_train:
         train_datasets = ElectraOnlyDecDataset(args=args, item_dict=train_datasets)
@@ -429,6 +570,35 @@ def main(
             evaluate(args, model, test_datasets, "test",
                      src_vocab, dec_vocab, global_step, our_sam_dict)
 
+    if args.do_inference:
+        test_datasets, origin_sentences = make_inference_data(args=args,
+                                            data_path=args.data_pkl,
+                                            num2kor=numeral_model,
+                                            tokenizer=tokenizer,
+                                            decode_vocab=dec_vocab)
+
+        test_datasets = ElectraOnlyDecDataset(args=args, item_dict=test_datasets)
+        checkpoints = list(os.path.dirname(c) for c in
+                           sorted(glob.glob(args.output_dir + "/**/" + "model.pt", recursive=True),
+                                  key=lambda path_with_step: list(map(int, re.findall(r"\d+", path_with_step)))[-1]))
+
+        if not args.eval_all_checkpoints:
+            checkpoints = checkpoints[-1:]
+        else:
+            logger.info("transformers.configuration_utils")
+            logger.info("transformers.modeling_utils")
+        logger.info("Evaluate the following checkpoints: %s", checkpoints)
+
+        for checkpoint in checkpoints:
+            global_step = checkpoint.split("-")[-1]
+
+            model = ElectraNartPosDecModel.build_model(args=args, tokenizer=tokenizer,
+                                                       src_vocab=src_vocab, dec_vocab=dec_vocab,
+                                                       post_proc_dict=post_proc_dict)
+            model.load_state_dict(torch.load(checkpoint + '/model.pt'))
+            model.to(args.device)
+            inference(args, model, test_datasets, "test",
+                     src_vocab, dec_vocab, global_step, our_sam_dict, origin_sentences)
 ### MAIN ###
 if '__main__' == __name__:
     logger.info(f'[run_digits_ensemble][__main__] START !')
