@@ -8,7 +8,8 @@ import argparse
 from attrdict import AttrDict
 from typing import Dict, List
 import numpy as np
-from definition.data_def import KT_TTS
+from definition.data_def import KT_TTS, OurSamItem
+
 
 from model.electra_std_pron_rule import ElectraStdPronRules
 from utils.kocharelectra_tokenization import KoCharElectraTokenizer
@@ -44,7 +45,6 @@ if "__main__" == __name__:
     parser.add_argument("--config_path", required=True)
     parser.add_argument("--decoder_vocab_path", required=True)
     parser.add_argument("--jaso_dict_path", required=True)
-    parser.add_argument("--our_sam_path", required=True)
     parser.add_argument("--max_seq_len", required=True)
     cli_args = parser.parse_args()
 
@@ -69,12 +69,6 @@ if "__main__" == __name__:
     post_proc_dict: Dict[str, Dict[str, List[str]]] = {}
     with open(cli_args.jaso_dict_path, mode="r", encoding="utf-8") as f:
         post_proc_dict = json.load(f)
-
-    ''' 우리말 샘 문자열-발음열 사전 '''
-    our_sam_dict = {}
-    with open(cli_args.our_sam_path, mode='rb') as f:
-        our_sam_dict = pickle.load(f)
-        our_sam_dict = make_g2p_word_dictionary(our_sam_word_items=our_sam_dict)
 
     # Do Test
     # tokenization
@@ -154,6 +148,7 @@ if "__main__" == __name__:
     candi_tok = torch.argmax(output, -1).detach().cpu()
     candi_str = "".join([decoder_vocab[x] for x in candi_tok.tolist()[0]]).strip()
     candi_str = candi_str.replace("[CLS]", "").replace("[SEP]", "").replace("[PAD]", "").strip()
+
 
     print(f"[ar_test][__main__] raw:\n{target_sent}")
     print(f"[ar_test][__main__] candi:\n{candi_str}")
