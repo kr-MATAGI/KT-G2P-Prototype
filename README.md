@@ -12,7 +12,7 @@
 <br>
 
  ```
- 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
+  ---비공개---
  ```
 <br>
 
